@@ -1,3 +1,3 @@
-# Techinical Blog posts
+# Technical Practice Posts
 
-Personal technical articles.
+I record some practical system configuration or building steps in here.

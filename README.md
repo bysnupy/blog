@@ -1,3 +1,3 @@
 # Technical Practices
 
-### The personal labs
+### The personal simple labs

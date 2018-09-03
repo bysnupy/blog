@@ -104,9 +104,10 @@ ba3794b9a54a        registry.access.redhat.com/rhscl/redis-32-rhel7   "container
 ![Input the database credential](https://github.com/bysnupy/blog/blob/master/quay/images/input_db_cred.png)
 
 - Wait a moment until restarting the container, if the container not restarting then you run the container with `docker run`.
-![Waiting restart db]()
+![Waiting restart db](https://github.com/bysnupy/blog/blob/master/quay/images/waiting_restart_db.png)
 
-- You create the super user at first time the quay hostname.
+- You create the `super user` at first time the QUAY hostname.
+![]()
 
 
 

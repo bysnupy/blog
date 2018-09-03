@@ -91,8 +91,23 @@ ba3794b9a54a        registry.access.redhat.com/rhscl/redis-32-rhel7   "container
 4ca907a1814d        registry.access.redhat.com/rhscl/mysql-57-rhel7   "container-entrypo..."   6 days ago          Up 6 minutes        0.0.0.0:3306->3306/tcp                               mysql
 ~~~
 
-:information_source: You need the access through the browser for initialization database to adjust the firewall rules. But I just stop the firewalld.service for simple testing.
+:information_source: You need the access through the browser for initialization database to adjust the firewall rules as open the 3306 port. 
 
 ~~~
-systemctl stop firewalld.service && systemctl disable firewalld.service
+# firewall-cmd --permanent --add-port=3306/tcp --add-port=6379/tcp --add-port=80/tcp --add-port=443/tcp
+# firewall-cmd --reload
 ~~~
+
+### Initialize the QUAY
+
+- Input the database credentials
+
+
+- Wait a moment until restarting the container, if the container not restarting then you run the container with `docker run`.
+
+
+- You create the super user at first time the quay hostname.
+
+
+
+

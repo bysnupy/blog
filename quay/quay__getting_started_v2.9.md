@@ -7,6 +7,8 @@ Item|Values
 -|-
 Version| QUAY v2.9.1
 Type| container image based installation
+Metadata storage|MySQL and PostgreSQL
+KVS|REDIS
 
 ## Installation Steps
 

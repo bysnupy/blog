@@ -106,8 +106,8 @@ ba3794b9a54a        registry.access.redhat.com/rhscl/redis-32-rhel7   "container
 - Wait a moment until restarting the container, if the container not restarting then you run the container manually with `docker run`.
 ![Waiting restart db](https://github.com/bysnupy/blog/blob/master/quay/images/waiting_restart_db.png)
 
-- You create the `super user` at first time the QUAY hostname.
-![]()
+- Create the `super user` at first time on the QUAY hostname.
+![Create the superuser](https://github.com/bysnupy/blog/blob/master/quay/images/create_superuser.png)
 
 
 

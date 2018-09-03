@@ -100,7 +100,8 @@ ba3794b9a54a        registry.access.redhat.com/rhscl/redis-32-rhel7   "container
 
 ### Initialize the QUAY
 
-- Input the database credentials
+- Input the database credentials, such as db username, db password, db name, and so on.
+[Input the database credential](https://github.com/bysnupy/blog/blob/master/quay/images/input_db_cred.png)
 
 
 - Wait a moment until restarting the container, if the container not restarting then you run the container with `docker run`.

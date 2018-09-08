@@ -1,3 +1,3 @@
 # Technical Practices
 
-### The personal simple labs
+### The personal simple lab posts

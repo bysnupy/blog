@@ -1,3 +1,5 @@
-# Technical Practices
+# Technical Practice Blog
 
-### The personal posts
+### The personal practice posts
+
+:warnning:

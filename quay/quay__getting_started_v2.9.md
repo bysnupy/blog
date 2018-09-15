@@ -6,7 +6,7 @@ It's a summary of a QUAY installation. You can refer the details of the installa
 Item|Values
 -|-
 Version| QUAY v2.9.1
-Type| container image based installation
+Type| Image based installation
 Metadata storage|MySQL and PostgreSQL
 KVS|REDIS
 

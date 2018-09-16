@@ -1,5 +1,4 @@
-# Technical Blog
+# Personal Technical Blog
 
-### The personal practice posts
 
 

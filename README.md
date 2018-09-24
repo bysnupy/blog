@@ -1,4 +1,4 @@
-# Technical Blog
+# Personal Technical Blog Posts
 
 
 

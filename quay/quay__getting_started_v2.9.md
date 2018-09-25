@@ -1,115 +1,98 @@
-# QUAY Installation v2.9
+# QUAY Basic Installation Practice
 
-It's a summary of a QUAY installation. You can refer the details of the installation steps from [here](https://access.redhat.com/documentation/en-us/red_hat_quay/2.9/html-single/getting_started_with_red_hat_quay/index)
+## Description 
+This installation practice is for testing and verification of the installation processes.
 
-## Environments
-Item|Values
+## Environment
+
+Component | Value 
 -|-
-Version| QUAY v2.9.1
-Install method| Container image
-Metadata storage|MySQL and PostgreSQL
-KVS|REDIS
+RHEL | 7.5
+PostgreSQL | 9.6
+Redis | 3.2
+
 
 ## Installation Steps
 
-### Prepare the installation
+This steps are required `RHEL` minimal installation.
 
-First of all, you should register subscription of Red Hat and enable the following repositories.
+### Register required subscription and Update the packages
+
 ~~~
+# subscription-manager register --username=<USERNAME>
+<password>
+
 # subscription-manager repos --disable="*"
-# subscription-manager repos \
-    --enable="rhel-7-server-rpms" \
-    --enable="rhel-7-server-extras-rpms"
+
+# subscription-manager repos --enable="rhel-7-server-rpms" \
+                             --enable="rhel-7-server-extras-rpms"
+                             
 # yum update -y
 ~~~
 
-Let's install a docker package.
-~~~
-# yum install docker -y
-# systemctl enable docker.service && systemctl start docker.service
-~~~
-
-If you have Red Hat account and authorization for searching the solution articles, you can read the solution for quay.io credential without creating a additional CoreOS account. It saved as `~/.docker/config.json`.
-
-And then install the database for QUAY.
+### Set up `Docker` service
 
 ~~~
---- Setting up the required values as environment variables for easy setting.
-# mkdir -p /mnt/hostmysql
-# chmod 0777 /mnt/hostmysql
-# export MYSQL_CONTAINER_NAME=mysql
-# export MYSQL_DATABASE=enterpriseregistrydb
-# export MYSQL_PASSWORD=redhat
-# export MYSQL_USER=quayuser
-# export MYSQL_ROOT_PASSWORD=redhat
+# yum install docker
 
---- Run the mysql databasae for metadata storage as container based on above values.
-# docker run \
-    --detach \
-    --restart=always \
-    --env MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD} \
-    --env MYSQL_USER=${MYSQL_USER} \
-    --env MYSQL_PASSWORD=${MYSQL_PASSWORD} \
-    --env MYSQL_DATABASE=${MYSQL_DATABASE} \
-    --name ${MYSQL_CONTAINER_NAME} \
-    --publish 3306:3306 \
-    -v /mnt/hostmysql:/var/lib/mysql/data:Z \
-    registry.access.redhat.com/rhscl/mysql-57-rhel7
+# systemctl enable docker.service
 
---- Create the local directory and run the redis for KVS as a docker container.
-# mkdir -p /mnt/hostredis
-# chmod 777 /mnt/hostredis
+# systemctl start docker.service
+
+# systemctl status docker.service
+~~~
+
+### Set up Authentication to `Quay.io` for pulling `QUAY` container image.
+
+If you authenticate the certified credential to `Quay.io`, then the `/root/.docker/config.json` is generated. You can use the authentication key in the `json`.
+
+
+### Deploy a Database (PostgreSQL)
+
+~~~
+# mkdir -p /mnt/pgdata
+
+# chmod 777 /mnt/pgdata
+
+# export POSTGRESQL_DATABASE=quay_db
+# export POSTGRESQL_PASSWORD=quay_db_pass
+# export POSTGRESQL_USER=quay_db_user
+# export POSTGRESQL_ADMIN_PASSWORD=postgres
+# export POSTGRESQL_CONTAINER_NAME=postgres
+
+# docker run --detach --restart=always --env POSTGRESQL_DATABASE=${POSTGRESQL_DATABASE} \
+  --env POSTGRESQL_USER=${POSTGRESQL_USER} --env POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD} \
+  --env POSTGRESQL_ADMIN_PASSWORD=${POSTGRESQL_ADMIN_PASSWORD} --name ${POSTGRESQL_CONTAINER_NAME} --publish 5432:5432 \
+  -v /mnt/pgdata:/var/lib/pgsql/data:Z registry.access.redhat.com/rhscl/postgresql-96-rhel7
+~~~
+
+Check the database connectivity using `psql` client.
+~~~
+# subscription-manager repos --enable="rhel-server-rhscl-7-rpms"
+# yum install rh-postgresql96-postgresql -y
+# firewall-cmd --permanent --add-port 5432/tcp
+# firewall-cmd --reload
+# LD_LIBRARY_PATH=/opt/rh/rh-postgresql96/root/usr/lib64 /opt/rh/rh-postgresql96/root/usr/bin/psql -U quay_db_user -h <HOST_IP_ADDRESS> quay_db
+~~~
+
+### Deploy `Redis`
+
+~~~
+# mkdir -p /mnt/redis
+
+# chmod 777 /mnt/redis
+
 # docker run -d --restart=always -p 6379:6379 \
-    -v /mnt/hostredis:/var/lib/redis/data:Z \
-    registry.access.redhat.com/rhscl/redis-32-rhel7
-
---- Check the docker status.
-# docker ps
-CONTAINER ID        IMAGE                                             COMMAND                  CREATED             STATUS              PORTS                                                NAMES
-ba3794b9a54a        registry.access.redhat.com/rhscl/redis-32-rhel7   "container-entrypo..."   6 days ago          Up 6 minutes        0.0.0.0:6379->6379/tcp                               elated_varahamihira
-4ca907a1814d        registry.access.redhat.com/rhscl/mysql-57-rhel7   "container-entrypo..."   6 days ago          Up 6 minutes        0.0.0.0:3306->3306/tcp                               mysql
+  -v /mnt/redis:/var/lib/redis/data:Z registry.access.redhat.com/rhscl/redis-32-rhel7
 ~~~
 
-### Deploy the QUAY
-
-It's so simple to deploy the QUAY.
-
+### Deploy `QUAY`
 ~~~
 # mkdir -p /var/run/quay/config
 # mkdir -p /var/run/quay/storage
 # docker run --restart=always -p 443:443 -p 80:80 \
-   --privileged=true \
-   -v /var/run/quay/config:/conf/stack \
-   -v /var/run/quay/storage:/datastorage \
-   -d quay.io/coreos/quay:v2.9.1
+     --privileged=true \
+     -v /var/run/quay/config:/conf/stack \
+     -v /var/run/quay/storage:/datastorage \
+     -d quay.io/coreos/quay:v2.9.2
 ~~~
-
-That's all. Then I'll check the status of it.
-
-~~~
-CONTAINER ID        IMAGE                                             COMMAND                  CREATED             STATUS              PORTS                                                NAMES
-c4218e5d629f        quay.io/coreos/quay:v2.9.1                        "/bin/sh -c ./quay..."   6 days ago          Up 6 minutes        0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp, 8443/tcp   cocky_saha
-ba3794b9a54a        registry.access.redhat.com/rhscl/redis-32-rhel7   "container-entrypo..."   6 days ago          Up 6 minutes        0.0.0.0:6379->6379/tcp                               elated_varahamihira
-4ca907a1814d        registry.access.redhat.com/rhscl/mysql-57-rhel7   "container-entrypo..."   6 days ago          Up 6 minutes        0.0.0.0:3306->3306/tcp                               mysql
-~~~
-
-:information_source: In my case, I should adjust the firewall rules as follows for accessing through browser to initialize the database and redis.
-~~~
-# firewall-cmd --permanent --add-port=3306/tcp --add-port=6379/tcp --add-port=80/tcp --add-port=443/tcp
-# firewall-cmd --reload
-~~~
-
-### Initialize the QUAY
-
-- Input the database credentials (such as `db username`, `db password`, `db name`, and so on), then it show you the restart button.
-![Input the database credential](https://github.com/bysnupy/blog/blob/master/quay/images/input_db_cred.png)
-
-- Wait a moment until restarting the container, if the container not restarting then you run the container manually with `docker run`.
-![Waiting restart db](https://github.com/bysnupy/blog/blob/master/quay/images/waiting_restart_db.png)
-
-- Create the `super user` at first time on the QUAY hostname.
-![Create the superuser](https://github.com/bysnupy/blog/blob/master/quay/images/create_superuser.png)
-
-
-
-

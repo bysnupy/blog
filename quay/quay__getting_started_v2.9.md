@@ -66,6 +66,38 @@ If you authenticate the certified credential to `Quay.io`, then the `/root/.dock
   -v /mnt/pgdata:/var/lib/pgsql/data:Z registry.access.redhat.com/rhscl/postgresql-96-rhel7
 ~~~
 
+Grant SuperUser role to POSTGRESQL_USER for enabling additional extension installation.
+~~~
+# docker ps
+CONTAINER ID        IMAGE                                                  COMMAND                  CREATED             STATUS              PORTS                                                NAMES
+e779937e30c2        registry.access.redhat.com/rhscl/postgresql-96-rhel7   "container-entrypo..."   30 minutes ago      Up 30 minutes       0.0.0.0:5432->5432/tcp                               postgres
+
+# docker exec -it e779937e30c2 /bin/bash
+
+bash-4.2$ psql 
+
+psql (9.6.10)
+Type "help" for help.
+
+postgres=# \du
+                                     List of roles
+  Role name   |                         Attributes                         | Member of 
+--------------+------------------------------------------------------------+-----------
+ postgres     | Superuser, Create role, Create DB, Replication, Bypass RLS | {}
+ quay_db_user |                                                            | {}
+ 
+postgres=# ALTER ROLE quay_db_user WITH SUPERUSER;
+ALTER ROLE
+postgres=# \du
+                                     List of roles
+  Role name   |                         Attributes                         | Member of 
+--------------+------------------------------------------------------------+-----------
+ postgres     | Superuser, Create role, Create DB, Replication, Bypass RLS | {}
+ quay_db_user | Superuser                                                  | {}
+
+postgres=# \q
+~~~
+
 Check the database connectivity using `psql` client.
 ~~~
 # subscription-manager repos --enable="rhel-server-rhscl-7-rpms"
@@ -96,3 +128,30 @@ Check the database connectivity using `psql` client.
      -v /var/run/quay/storage:/datastorage \
      -d quay.io/coreos/quay:v2.9.2
 ~~~
+
+### Completing the Guided Setup
+
+Open the `6379(redis)`, `80(http)` and `443(https)` port before setup.
+
+~~~
+# firewall-cmd --permanent --add-port 6379/tcp --add-service http --add-service https
+
+# firewall-cmd --reload
+~~~
+
+Access `http://<HOSTNAME>/setup`
+
+- Input Database connectivity information.
+![Step1](https://github.com/bysnupy/blog/images/quay_guided_step1.png)
+
+- Create Administrator account of `QUAY`.
+![Step2](https://github.com/bysnupy/blog/images/quay_guided_step2.png)
+
+- Configure additional setup in the `QUAY`.
+![Step3](https://github.com/bysnupy/blog/images/quay_guided_step3.png)
+
+- Restart `QUAY` container for taking effect.
+![Step4](https://github.com/bysnupy/blog/images/quay_guided_step4.png)
+
+- Complete the `QUAY` initialization.
+![Step5](https://github.com/bysnupy/blog/images/quay_guided_step5.png)

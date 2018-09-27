@@ -142,16 +142,16 @@ Open the `6379(redis)`, `80(http)` and `443(https)` port before setup.
 Access `http://<HOSTNAME>/setup`
 
 - Input Database connectivity information.
-![Step1](https://github.com/bysnupy/blog/images/quay_guided_step1.png)
+![Step1](https://github.com/bysnupy/blog/blob/master/quay/images/quay_guided_setup1.png)
 
 - Create Administrator account of `QUAY`.
-![Step2](https://github.com/bysnupy/blog/images/quay_guided_step2.png)
+![Step2](https://github.com/bysnupy/blog/blob/master/quay/images/quay_guided_step2.png)
 
 - Configure additional setup in the `QUAY`.
-![Step3](https://github.com/bysnupy/blog/images/quay_guided_step3.png)
+![Step3](https://github.com/bysnupy/blog/blob/master/quay/images/quay_guided_step3.png)
 
 - Restart `QUAY` container for taking effect.
-![Step4](https://github.com/bysnupy/blog/images/quay_guided_step4.png)
+![Step4](https://github.com/bysnupy/blog/blob/master/quay/images/quay_guided_step4.png)
 
 - Complete the `QUAY` initialization.
-![Step5](https://github.com/bysnupy/blog/images/quay_guided_step5.png)
+![Step5](https://github.com/bysnupy/blog/blob/master/quay/images/quay_guided_step5.png)

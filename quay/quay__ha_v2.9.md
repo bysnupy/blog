@@ -1,7 +1,7 @@
 # QUAY High Availability Installation Practice
 
 ## Description
-This steps describes how to deploy a high availability QUAY installation.
+These steps describe how to deploy a high availability QUAY installation.
 
 ## Environment
 Component | Value

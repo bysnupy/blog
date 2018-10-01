@@ -7,3 +7,5 @@ This steps describes how to deploy a high availability QUAY installation.
 Component | Value
 -|-
 RHEL | 7.5
+Quay | 2.9
+

@@ -8,4 +8,4 @@ Component | Value
 -|-
 RHEL | 7.5
 Quay | 2.9
-
+PostgreSQL|9.6

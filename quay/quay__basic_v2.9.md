@@ -158,3 +158,4 @@ Access `http://<HOSTNAME>/setup`
 ![Step5](https://github.com/bysnupy/blog/blob/master/quay/images/quay_guided_setup5.png)
 
 The Installation is done.
+

@@ -12,7 +12,7 @@ Operator SDKはそのOperatorを簡単に作成できるようにしてくれる
 ドキュメントに記載されている手順を言葉で解説するだけでは面白くないと思いまして
 仮にメンテナンスページを切り替えするOperatorを次の設計で作成してみます。
 
-// TODO : 図面追加
+![maintpage-operator work process](https://github.com/bysnupy/maintpage-operator/blob/master/maintpage-operator-process-diagram.png)
 
 ~~~
 apiVersion: maintpage.example.com/v1alpha1

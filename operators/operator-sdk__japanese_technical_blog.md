@@ -14,7 +14,7 @@ Operator SDKはそのOperatorを簡単に作成できるようにしてくれる
 
 ![maintpage-operator work process](https://github.com/bysnupy/maintpage-operator/blob/master/maintpage-operator-process-diagram.png)
 
-~~~
+~~~yaml
 apiVersion: maintpage.example.com/v1alpha1
 kind: MaintPage
 metadata:
@@ -41,7 +41,7 @@ spec:
 この記事ではLinuxをベースに進めておりますが、MacOSも支援されますので詳細は[3]を参照してください。
 
 * GO設置
-~~~
+~~~console
 # GOVERSION=1.12.9
 # wget https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz
 # tar -zxvf go${GOVERSION}.linux-amd64.tar.gz
@@ -55,7 +55,7 @@ export GO111MODULE=on
 ~~~
 
 * Operator SDK設置
-~~~
+~~~console
 # yum install mercurial -y
 # mkdir $HOME/bin
 # RELEASE_VERSION=v0.10.0
@@ -65,7 +65,7 @@ export GO111MODULE=on
 ~~~
 
 * 動作確認
-~~~
+~~~console
 # go version
 go version go1.12.9 linux/amd64
 # operator-sdk version
@@ -79,7 +79,7 @@ operator-sdk version: v0.10.0, commit: ff80b17737a6a0aade663e4827e8af3ab5a21170
 下記で紹介するコードはロジックの実装のみ記載していてエラー及びログ処理は省略しています。
 
 * 作業用のプロジェクトを作成、ディレクトリパスは環境に合わせて調整してください。
-~~~
+~~~console
 # mkdir -p $GOPATH/src/github.com/bysnupy
 # cd $GOPATH/src/github.com/bysnupy
 # operator-sdk new maintpage-operator --repo github.com/bysnupy/maintpage-operator
@@ -87,14 +87,16 @@ operator-sdk version: v0.10.0, commit: ff80b17737a6a0aade663e4827e8af3ab5a21170
 ~~~
 
 * CRD(Custom Resource Definition)用のAPIを追加
-~~~
+~~~console
 # cd $GOPATH/src/github.com/bysnupy/maintpage-operator
 # operator-sdk add api --api-version maintpage.example.com/v1alpha1 --kind MaintPage
 ~~~
 
 * CRで設定できる設定項目を定義、修正した内容のみ記載しています。
-~~~
+~~~console
 # vim $GOPATH/src/github.com/bysnupy/maintpage-operator/pkg/apis/maintpage/v1alpha1/maintpage_types.go
+~~~
+~~~go
 // CRの操作時に利用する項目パラメータを定義
 type MaintPageSpec struct {
         MaintPageConfig MaintPageConfig `json:"maintpageconfig"`
@@ -125,13 +127,13 @@ type AppConfig struct {
 
 * `maintpage_types.go`の内容が変更された後には忘れずに"operator-sdk generate k8s"で
   修正内容に合わせて必要なコードを再生成してください。
-~~~
+~~~console
 # cd $GOPATH/src/github.com/bysnupy/maintpage-operator
 # operator-sdk generate k8s
 ~~~
 
 * 上記の手順で追加したCR(MaintPage)の定義に合わせてどのように操作するか実装するコントローラーを追加してください。
-~~~
+~~~console
 # cd $GOPATH/src/github.com/bysnupy/maintpage-operator
 # operator-sdk add controller --api-version maintpage.example.com/v1alpha1 --kind MaintPage
 ~~~
@@ -140,8 +142,10 @@ type AppConfig struct {
   - CRUDのイベントを監視(Watch)するリソースを指定します。
   - 指定したリソースにイベントが発生するたびにカスタムしたロジックが適用・一致(Reconcile)されます。
 
-~~~
+~~~console
 # vim $GOPATH/src/github.com/bysnupy/maintpage-operator/pkg/controller/maintpage/maintpage_controller.go
+~~~
+~~~go
 // イベントを監視したいリソースを次の関数配下で追加してください。
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 ...省略...
@@ -208,7 +212,7 @@ func (r *ReconcileMaintPage) Reconcile(request reconcile.Request) (reconcile.Res
 実際にDeploymentやServiceを作成するなどのCRUD操作を実装したClient APIのより詳細な情報は[4]を参照ください。
 
 残りの関数は各リソースの定義をKubernetes APIで実装したものになります。どのように定義しているかみてみましょう。
-~~~
+~~~go
 // メンテナンスページ用のPodをCRで定義した名前とイメージをベースに作成する関数になります。
 func newPodForMaintPage(m *maintpagev1alpha1.MaintPage) *corev1.Pod {
         maintpageimage := m.Spec.MaintPageConfig.MaintPageImage
@@ -306,7 +310,7 @@ func updateMaintStatus(m *maintpagev1alpha1.MaintPage, status string) *maintpage
 こちらではhttpdコンテナにそれぞれ"Maintenance Page !"と"Production Page !"が記載されたindex.htmlを追加したものでテストしています。
 
 * Operatorのビルド
-~~~
+~~~console
 # oc create -f $GOPATH/src/github.com/bysnupy/maintpage-operator/deploy/maintpage_v1alpha1_maintpage_crd.yaml
 # cd $GOPATH/src/github.com/bysnupy/maintpage-operator
 # go mod vendor
@@ -316,7 +320,7 @@ func updateMaintStatus(m *maintpagev1alpha1.MaintPage, status string) *maintpage
 ~~~
 
 * Operatorの設置、プロジェクト名は適切にご調整ください。設置前にpushしたレジストリからイメージpullできるか確認してください。
-~~~
+~~~console
 # oc new-project maintpage-operator
 # oc create -f deploy/service_account.yaml
 # oc create -f deploy/role.yaml
@@ -329,7 +333,7 @@ maintpage-operator-6df9d9c85c-s7xmw   1/1       Running   0          20s
 ~~~
 
 * CR(MaintPage)を定義してメンテナンス及びアプリケーションページ用のPodを作成してください。
-~~~
+~~~console
 # oc create -n maintpage-operator -f - <<EOF
 apiVersion: maintpage.example.com/v1alpha1
 kind: MaintPage
@@ -360,7 +364,7 @@ httpd     ClusterIP   172.30.131.106   <none>        8080/TCP   21m
 CRの`Maintpagetoggle`をtrueに更新してメンテナンスページの切り替えとDeploymentのイメージをマニュアルで更新しても変更されないか確認しましょう。
 
 次の通り、Deploymentのイメージはマニュアルで変更しても更新されないことが確認できます。
-~~~
+~~~console
 # oc edit deployment/httpd -n maintpage-operator
 ...
 spec:
@@ -372,7 +376,7 @@ spec:
 ~~~
 
 次の通り、CR(MaintPage)の`Maintpagetoggle`をtrue/falseに更新することでページ表示が変わることが確認できます。
-~~~
+~~~console
 // 変更前の状態は"Maintpublishstatus:  Not Published"です。
 # oc describe maintpage example -n maintpage-operator
 Name:         example

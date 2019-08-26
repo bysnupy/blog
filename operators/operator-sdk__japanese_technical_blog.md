@@ -3,14 +3,14 @@
 Red HatでOpenShiftのサポートエンジニアをしているDaein（デイン）です。
 
 OperatorをOperator SDKで作成してOpenShiftで稼働してみます。
-ドキュメントのサンプルOperatorの作成のみでは情報が足りないと思っている方にOperator作成手順をピンポイントで解説します。[0]
+ドキュメントのサンプルOperatorの作成のみでは情報が足りないと思っている方に、Operator作成手順をコードコメントを入れてstep by stepで解説していきます。[0]
 
-既にOperatorという用語に慣れている方が多いと思いますが、簡単に紹介します。
-Operatorとは管理業務を自動化する目的でKubernetes Controllerをカスタムする実装パタンで[1]、
+既にOperatorという用語に慣れている方が多いかもしれませんが、簡単に紹介します。
+Operatorとは管理業務を自動化する目的でKubernetes Controllerをカスタムする実装パターンで[1]、
 Operator SDKはそのOperatorを簡単に作成できるようにしてくれる開発ツールです。
 
-ドキュメントに記載されている手順を言葉で解説するだけでは面白くないと思いまして
-仮にメンテナンスページを切り替えするOperatorを次の設計で作成してみます。
+ドキュメント[2]に記載されている手順とは別のサンプル実装として、
+メンテナンスページを切り替えするOperatorを次の設計で作成してみます。このOperatorは、アプリケーションpodとメンテナンスページ用podの2つのpodをデプロイし、それら、2つのpodにアクセスを切り換えます。詳細なフローとCR( CustomResource )の定義は次のようになっています。
 
 ![maintpage-operator work process](https://github.com/bysnupy/maintpage-operator/blob/master/maintpage-operator-process-diagram.png)
 
@@ -38,9 +38,9 @@ spec:
 
 ## Operator SDKの設置
 
-この記事ではLinuxをベースに進めておりますが、MacOSも支援されますので詳細は[3]を参照してください。
+この記事ではLinuxをベースに進めておりますが、MacOSも利用可能です。詳細は[3]を参照してください。
 
-* GO設置
+* GOのインストール
 ~~~console
 # GOVERSION=1.12.9
 # wget https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz
@@ -54,7 +54,7 @@ export GO111MODULE=on
 # source ~/.bash_profile
 ~~~
 
-* Operator SDK設置
+* Operator SDKのインストール
 ~~~console
 # yum install mercurial -y
 # mkdir $HOME/bin
@@ -72,7 +72,7 @@ go version go1.12.9 linux/amd64
 operator-sdk version: v0.10.0, commit: ff80b17737a6a0aade663e4827e8af3ab5a21170
 ~~~
 
-設置完了です。早速プロジェクトを作成してOperatorを作成してみましょう。
+以上で、インストール完了です。早速プロジェクトを作成してOperatorを作成してみましょう。
 
 ## Operatorの作成
 
@@ -301,7 +301,7 @@ func updateMaintStatus(m *maintpagev1alpha1.MaintPage, status string) *maintpage
 }
 ~~~
 
-コードの全文は[7]からご確認できます。
+コードの全文は[7]から確認できます。
 
 ## Operatorのビルド及び設置
 

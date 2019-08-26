@@ -423,6 +423,7 @@ Events:                <none>
 
 本記事では任意で決めた仕様に合わせてOperator SDKを利用してどのようにOperatorが作成されるかみてみました。
 こちらで紹介している内容以外でも実装仕様によってはfinalizer[5]やOLM(Operator Lifecycle Manager)[6]の実装も工夫する必要があるでしょう。
+既に数多くのOperatorが[8]と[9]で提供されてOpenSourceとして公開されておりますので皆さんが実装に困った時には参考になれると思います。
 
 
 
@@ -442,3 +443,7 @@ Events:                <none>
   -  [https://docs.openshift.com/container-platform/4.1/applications/operator_sdk/osdk-getting-started.html#managing-memcached-operator-using-olm_osdk-getting-started]
 - [7] Maintpage-Operator Github
 　-　[https://github.com/bysnupy/maintpage-operator]
+- [8] Awesome Operators in the Wild
+  - [https://github.com/operator-framework/awesome-operators#awesome-operators-in-the-wild]
+- [9] OperatorHub.io
+  - [https://operatorhub.io/]

@@ -2,15 +2,11 @@
 
 Red HatでOpenShiftのサポートエンジニアをしているDaein（デイン）です。
 
-OperatorをOperator SDKで作成してOpenShiftで稼働してみます。
-ドキュメント[0]のサンプルOperatorの作成のみでは情報が足りないと思っている方に、Operator作成手順をコードコメントを入れてstep by stepで解説していきます。
+OperatorをOperator SDKで作成してOpenShiftで稼働させてみます。ドキュメント[0]のサンプルOperatorの作成のみでは情報が足りないと思っている方に、Operator作成手順をコードコメントを入れてstep by stepで解説していきます。
 
-既にOperatorという用語に慣れている方が多いかもしれませんが、簡単に紹介します。
-Operatorとは管理業務を自動化する目的でKubernetes Controllerをカスタムする実装パターンで[1]、
-Operator SDK[2]はそのOperatorを簡単に作成できるようにしてくれる開発ツールです。
+既にOperatorという用語に慣れている方が多いかもしれませんが、簡単に紹介します。Operatorとは管理業務を自動化する目的でKubernetes Controllerを実装するパターンで[1]、Operator SDK[2]はそのOperatorを簡単に作成できるようにしてくれる開発ツールです。
 
-ドキュメントに記載されている手順とは別のサンプル実装として、
-メンテナンスページを切り替えするOperatorを次の設計で作成してみます。このOperatorは、アプリケーションpodとメンテナンスページ用podの2つのpodをデプロイし、それら、2つのpodにアクセスを切り換えます。詳細なフローとCR( CustomResource )の定義は次のようになっています。
+ドキュメントに記載されている手順とは別のサンプル実装として、メンテナンスページの切り替えを行うOperatorを作成してみます。このOperatorは、アプリケーションpodとメンテナンスページ用podの2つのpodをデプロイし、それら2つのpodのアクセスを切り換えます。詳細なフローとCR(CustomResource)の定義は次のようになっています。
 
 ![maintpage-operator work process](https://github.com/bysnupy/maintpage-operator/blob/master/maintpage-operator-process-diagram.png)
 
@@ -28,7 +24,7 @@ spec:
     appimage: quay.io/daein/prodpage:latest        // アプリケーション用のコンテナイメージ
 ~~~
 
-上記のCR（CustomResource）を作成するとOperatorが次のタスクを実施してくれるように作成します。
+上記のCR(CustomResource)を作成するとOperatorが次のタスクを実施してくれるように作成します。
 
   - メンテナンスページのみ表示するPod(example-maintpage-pod)を作成する
   - アプリケーションページを表示するPod(httpd)をスケジュールするDeployment(httpd)と紐づいたService(httpd)を作成する
@@ -40,7 +36,7 @@ spec:
 
 この記事ではLinuxをベースに進めておりますが、MacOSも利用可能です。詳細は[3]を参照してください。
 
-* GOのインストール
+* Goのインストール
 ~~~console
 # GOVERSION=1.12.9
 # wget https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz
@@ -138,9 +134,9 @@ type AppConfig struct {
 # operator-sdk add controller --api-version maintpage.example.com/v1alpha1 --kind MaintPage
 ~~~
 
-* 基本的に次の順で関数をカスタムしてロジックを実装すればと思います。
+* 基本的に次の順で関数をカスタムしてロジックを実装します。
   - CRUDのイベントを監視(Watch)するリソースを指定します。
-  - 指定したリソースにイベントが発生するたびにカスタムしたロジックが適用・一致(Reconcile)されます。
+  - 指定したリソースにイベントが発生するたびにカスタムロジックが適用・一致(Reconcile)されます。
 
 ~~~console
 # vim $GOPATH/src/github.com/bysnupy/maintpage-operator/pkg/controller/maintpage/maintpage_controller.go
@@ -305,9 +301,7 @@ func updateMaintStatus(m *maintpagev1alpha1.MaintPage, status string) *maintpage
 
 ## Operatorのビルド及び設置
 
-次の手順でOperatorをビルドしてイメージを適切なレジストリにpushしてください。
-また、メンテナンスページ及びアプリケーションページのコンテナイメージは別途用意してください。
-こちらではhttpdコンテナにそれぞれ"Maintenance Page !"と"Production Page !"が記載されたindex.htmlを追加したものでテストしています。
+次の手順でOperatorをビルドしてイメージを適切なレジストリにpushしてください。また、メンテナンスページ及びアプリケーションページのコンテナイメージは別途用意してください。こちらではhttpdコンテナにそれぞれ"Maintenance Page !"と"Production Page !"が記載されたindex.htmlを追加したものでテストしています。
 
 * Operatorのビルド
 ~~~console
@@ -421,11 +415,7 @@ Events:                <none>
 
 "maintpagetoggle: false"に戻して元の状態になるかも確認してください。
 
-本記事では任意で決めた仕様に合わせてOperator SDKを利用してどのようにOperatorが作成されるかみてみました。
-こちらで紹介している内容以外でも実装仕様によってはfinalizer[5]やOLM(Operator Lifecycle Manager)[6]の実装も工夫する必要があるでしょう。
-既に数多くのOperatorがOperatorHub.io[8]とGitHub[9]で提供されてOpenSourceとして公開されていますので実装に困った時には参考すればと思います。
-
-
+本記事では任意で決めた仕様に合わせてOperator SDKを利用してどのようにOperatorが作成されるかみてみました。こちらで紹介している内容以外でも実装仕様によってはfinalizer[5]やOLM(Operator Lifecycle Manager)[6]の実装も検討する必要があるでしょう。既に数多くのOperatorがOperatorHub.io[8]とGitHub[9]で提供されてOpenSourceとして公開されていますので実装に困った時には参考にすると良いと思います。
 
 - [0] Building a Go-based Memcached Operator using the Operator SDK
   -  [https://docs.openshift.com/container-platform/4.1/applications/operator_sdk/osdk-getting-started.html#building-memcached-operator-using-osdk_osdk-getting-started]

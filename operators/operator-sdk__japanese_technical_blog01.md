@@ -3,13 +3,13 @@
 Red HatでOpenShiftのサポートエンジニアをしているDaein（デイン）です。
 
 OperatorをOperator SDKで作成してOpenShiftで稼働してみます。
-ドキュメントのサンプルOperatorの作成のみでは情報が足りないと思っている方に、Operator作成手順をコードコメントを入れてstep by stepで解説していきます。[0]
+ドキュメント[0]のサンプルOperatorの作成のみでは情報が足りないと思っている方に、Operator作成手順をコードコメントを入れてstep by stepで解説していきます。
 
 既にOperatorという用語に慣れている方が多いかもしれませんが、簡単に紹介します。
 Operatorとは管理業務を自動化する目的でKubernetes Controllerをカスタムする実装パターンで[1]、
-Operator SDKはそのOperatorを簡単に作成できるようにしてくれる開発ツールです。
+Operator SDK[2]はそのOperatorを簡単に作成できるようにしてくれる開発ツールです。
 
-ドキュメント[2]に記載されている手順とは別のサンプル実装として、
+ドキュメントに記載されている手順とは別のサンプル実装として、
 メンテナンスページを切り替えするOperatorを次の設計で作成してみます。このOperatorは、アプリケーションpodとメンテナンスページ用podの2つのpodをデプロイし、それら、2つのpodにアクセスを切り換えます。詳細なフローとCR( CustomResource )の定義は次のようになっています。
 
 ![maintpage-operator work process](https://github.com/bysnupy/maintpage-operator/blob/master/maintpage-operator-process-diagram.png)
@@ -78,7 +78,7 @@ operator-sdk version: v0.10.0, commit: ff80b17737a6a0aade663e4827e8af3ab5a21170
 
 下記で紹介するコードはロジックの実装のみ記載していてエラー及びログ処理は省略しています。
 
-* 作業用のプロジェクトを作成、ディレクトリパスは環境に合わせて調整してください。
+* 作業用のプロジェクトを作成: ディレクトリパスは環境に合わせて調整してください。
 ~~~console
 # mkdir -p $GOPATH/src/github.com/bysnupy
 # cd $GOPATH/src/github.com/bysnupy
@@ -92,7 +92,7 @@ operator-sdk version: v0.10.0, commit: ff80b17737a6a0aade663e4827e8af3ab5a21170
 # operator-sdk add api --api-version maintpage.example.com/v1alpha1 --kind MaintPage
 ~~~
 
-* CRで設定できる設定項目を定義、修正した内容のみ記載しています。
+* CRで設定できる設定項目を定義: 修正した内容のみ記載しています。
 ~~~console
 # vim $GOPATH/src/github.com/bysnupy/maintpage-operator/pkg/apis/maintpage/v1alpha1/maintpage_types.go
 ~~~
@@ -319,7 +319,7 @@ func updateMaintStatus(m *maintpagev1alpha1.MaintPage, status string) *maintpage
 # docker push quay.io/daein/maintpage-operator:v0.0.1
 ~~~
 
-* Operatorの設置、プロジェクト名は適切にご調整ください。設置前にpushしたレジストリからイメージpullできるか確認してください。
+* Operatorの設置: プロジェクト名は適切にご調整ください。設置前にpushしたレジストリからイメージpullできるか確認してください。
 ~~~console
 # oc new-project maintpage-operator
 # oc create -f deploy/service_account.yaml
@@ -423,7 +423,7 @@ Events:                <none>
 
 本記事では任意で決めた仕様に合わせてOperator SDKを利用してどのようにOperatorが作成されるかみてみました。
 こちらで紹介している内容以外でも実装仕様によってはfinalizer[5]やOLM(Operator Lifecycle Manager)[6]の実装も工夫する必要があるでしょう。
-既に数多くのOperatorが[8]と[9]で提供されてOpenSourceとして公開されておりますので皆さんが実装に困った時には参考になれると思います。
+既に数多くのOperatorがOperatorHub.io[8]とGitHub[9]で提供されてOpenSourceとして公開されていますので実装に困った時には参考すればと思います。
 
 
 
@@ -443,7 +443,7 @@ Events:                <none>
   -  [https://docs.openshift.com/container-platform/4.1/applications/operator_sdk/osdk-getting-started.html#managing-memcached-operator-using-olm_osdk-getting-started]
 - [7] Maintpage-Operator Github
 　-　[https://github.com/bysnupy/maintpage-operator]
-- [8] Awesome Operators in the Wild
-  - [https://github.com/operator-framework/awesome-operators#awesome-operators-in-the-wild]
-- [9] OperatorHub.io
+- [8] OperatorHub.io
   - [https://operatorhub.io/]
+- [9] Awesome Operators in the Wild
+  - [https://github.com/operator-framework/awesome-operators#awesome-operators-in-the-wild]

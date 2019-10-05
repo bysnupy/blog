@@ -141,7 +141,7 @@ func (g *GenericPLEG) relist() {
 ```
 
 I start to check the processes in order into the `relist()` from now.
-`kubelet_pleg_relist_latency_microseconds` is calculated by the elapsed time for `relist()` as follows.
+`kubelet_pleg_relist_latency_microseconds`(Prometheus metrics) is calculated by the elapsed time for `relist()` as follows.
 ```go
 timestamp := g.clock.Now()
 defer func() {

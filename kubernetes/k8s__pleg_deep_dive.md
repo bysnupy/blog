@@ -2,15 +2,18 @@
 
 ## Introduction
 
-The PLEG(Pod Lifecycle Event Generator) in kubelet(Kubernetes) convert the container runtime states with each matched pod-level event and maintain the pod cache up-to-date. This PLEG keep watching health state as calling Healty() function periadically. If the relistTime is greater than 3 minutes, "PLEG is not healthy" is shown.
+The PLEG(Pod Lifecycle Event Generator) in kubelet(Kubernetes) convert the container runtime states with each matched pod-level event and maintain the pod cache up-to-date. This PLEG keep watching health state as calling `Healty()` function periodically by `runtimeState`. If the relistTime is greater than 3 minutes, "PLEG is not healthy" is shown.
 
+
+* `Healthy()` is implementation for PLEG health check method.
 ```go
-// The threshold needs to be greater than the relisting period + the
-// relisting time, which can vary significantly. Set a conservative
-// threshold to avoid flipping between healthy and unhealthy.
-relistThreshold = 3 * time.Minute
+// pkg/kubelet/pleg/generic.go - Healthy()
+
+		// The threshold needs to be greater than the relisting period + the
+		// relisting time, which can vary significantly. Set a conservative
+		// threshold to avoid flipping between healthy and unhealthy.
+		relistThreshold = 3 * time.Minute
 ...
-// pkg/kubelet/pleg/generic.go
 func (g *GenericPLEG) Healthy() (bool, error) {
 	relistTime := g.getRelistTime()
 	elapsed := g.clock.Since(relistTime)
@@ -20,6 +23,40 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	return true, nil
 }
 ```
+
+* The `Healthy()` is registered `runtimeState` by `addHealthCheck` as "PLEG" name.
+```go
+// pkg/kubelet/kubelet.go - NewMainKubelet()
+func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
+...
+		klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
+```	
+
+* The registered `healthCheck`(`Healthy()`) is evaluated periodically by `runtimeState.runtimeErrors` in `syncLoop`.
+```go
+// pkg/kubelet/kubelet.go - syncLoop()
+func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHandler) {
+...
+		for {
+				if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
+					glog.Infof("skipping pod synchronization - %v", rs)
+					// exponential backoff
+					time.Sleep(duration)
+					duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
+					continue
+				}
+
+// pkg/kubelet/runtime.go - runtimeErrors()
+func (s *runtimeState) runtimeErrors() []string {
+...	
+		for _, hc := range s.healthChecks {
+			if ok, err := hc.fn(); !ok {
+				ret = append(ret, fmt.Sprintf("%s is not healthy: %v", hc.name, err))
+			}
+		}
+```
+
+
 
 I'd like to follow the `relist` to examine why "PLEG is unheathy" happen in the process from now.
 The `relist` is executed periodically(1s by default) by as follows.
@@ -142,6 +179,7 @@ func (g *GenericPLEG) relist() {
 
 I start to check the processes in order into the `relist()` from now.
 `kubelet_pleg_relist_latency_microseconds`(Prometheus metrics) is calculated by the elapsed time for `relist()` as follows.
+
 ```go
 timestamp := g.clock.Now()
 defer func() {
@@ -153,5 +191,6 @@ defer func() {
 
 [0] Kubelet: Pod Lifecycle Event Generator (PLEG)
     [https://github.com/bysnupy/community/blob/master/contributors/design-proposals/node/pod-lifecycle-event-generator.md]
+
 [1] Kubelet: Runtime Pod Cache
     [https://github.com/bysnupy/community/blob/master/contributors/design-proposals/node/runtime-pod-cache.md]

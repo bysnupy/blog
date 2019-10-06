@@ -284,7 +284,6 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
 	sandboxes, err := m.getKubeletSandboxes(all)
 
-
 // pkg/kubelet/kuberuntime/kuberuntime_sandbox.go - getKubeletSandboxes()
 
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.

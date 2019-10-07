@@ -110,7 +110,7 @@ func (g *GenericPLEG) relist() {
 	}()
 ```
 
-* Get all pods(included stopped pods by `GetPods(true)`) from container runtime.[0]
+* Get all pods(included stopped pods by `GetPods(true)`) from container runtime.
 ```go
 	// Get all the pods.
 	podList, err := g.runtime.GetPods(true)
@@ -120,160 +120,7 @@ func (g *GenericPLEG) relist() {
 	}
 ```
 
-* At this point, time of last relist time updates as current timestamp.
-  In other words, the elasped time in `Healthy()` can be evaluated as starting point at this updated timestamp, if `GetPods()` processed without any latency.
-```go
-	g.updateRelistTime(timestamp)
-```
-
-* All pods gotten from container runtime are setting as current pods, and to compare old and current pods to generate/update related each matched event.
-```go
-	pods := kubecontainer.Pods(podList)
-	g.podRecords.setCurrent(pods)
-
-	// Compare the old and the current pods, and generate events.
-	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
-	for pid := range g.podRecords {
-		oldPod := g.podRecords.getOld(pid)
-		pod := g.podRecords.getCurrent(pid)
-		// Get all containers in the old and the new pod.
-		allContainers := getContainersFromPods(oldPod, pod)
-		for _, container := range allContainers {
-			events := computeEvents(oldPod, pod, &container.ID)
-			for _, e := range events {
-				updateEvents(eventsByPodID, e)
-			}
-		}
-	}
-```
-
-* If there are pods to be updated events, the related podCache should be updated.
-```go
-	var needsReinspection map[types.UID]*kubecontainer.Pod
-	if g.cacheEnabled() {
-		needsReinspection = make(map[types.UID]*kubecontainer.Pod)
-	}
-
-	// If there are events associated with a pod, we should update the
-	// podCache.
-	for pid, events := range eventsByPodID {
-		pod := g.podRecords.getCurrent(pid)
-		if g.cacheEnabled() {
-			// updateCache() will inspect the pod and update the cache. If an
-			// error occurs during the inspection, we want PLEG to retry again
-			// in the next relist. To achieve this, we do not update the
-			// associated podRecord of the pod, so that the change will be
-			// detect again in the next relist.
-			// TODO: If many pods changed during the same relist period,
-			// inspecting the pod and getting the PodStatus to update the cache
-			// serially may take a while. We should be aware of this and
-			// parallelize if needed.
-			if err := g.updateCache(pod, pid); err != nil {
-				glog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
-
-				// make sure we try to reinspect the pod during the next relisting
-				needsReinspection[pid] = pod
-
-				continue
-			} else if _, found := g.podsToReinspect[pid]; found {
-				// this pod was in the list to reinspect and we did so because it had events, so remove it
-				// from the list (we don't want the reinspection code below to inspect it a second time in
-				// this relist execution)
-				delete(g.podsToReinspect, pid)
-			}
-		}
-		// Update the internal storage and send out the events.
-		g.podRecords.update(pid)
-		for i := range events {
-			// Filter out events that are not reliable and no other components use yet.
-			if events[i].Type == ContainerChanged {
-				continue
-			}
-			g.eventChannel <- events[i]
-		}
-	}
-```
-
-* Any pods that failed in the previous loop are try to update cache again.
-```go
-	if g.cacheEnabled() {
-		// reinspect any pods that failed inspection during the previous relist
-		if len(g.podsToReinspect) > 0 {
-			glog.V(5).Infof("GenericPLEG: Reinspecting pods that previously failed inspection")
-			for pid, pod := range g.podsToReinspect {
-				if err := g.updateCache(pod, pid); err != nil {
-					glog.Errorf("PLEG: pod %s/%s failed reinspection: %v", pod.Name, pod.Namespace, err)
-					needsReinspection[pid] = pod
-				}
-			}
-		}
-
-		// Update the cache timestamp.  This needs to happen *after*
-		// all pods have been properly updated in the cache.
-		g.cache.UpdateTime(timestamp)
-	}
-
-	// make sure we retain the list of pods that need reinspecting the next time relist is called
-	g.podsToReinspect = needsReinspection
-}
-```
-
-* `updateCache()` get a specific container status and IP using `GetPodStatus()` and `getPodIP()`.
-```
-// pkg/kubelet/generic.go - updateCache()
-func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
-	if pod == nil {
-		// The pod is missing in the current relist. This means that
-		// the pod has no visible (active or inactive) containers.
-		glog.V(4).Infof("PLEG: Delete status for pod %q", string(pid))
-		g.cache.Delete(pid)
-		return nil
-	}
-	timestamp := g.clock.Now()
-	// TODO: Consider adding a new runtime method
-	// GetPodStatus(pod *kubecontainer.Pod) so that Docker can avoid listing
-	// all containers again.
-	status, err := g.runtime.GetPodStatus(pod.ID, pod.Name, pod.Namespace)
-	glog.V(4).Infof("PLEG: Write status for %s/%s: %#v (err: %v)", pod.Name, pod.Namespace, status, err)
-	if err == nil {
-		// Preserve the pod IP across cache updates if the new IP is empty.
-		// When a pod is torn down, kubelet may race with PLEG and retrieve
-		// a pod status after network teardown, but the kubernetes API expects
-		// the completed pod's IP to be available after the pod is dead.
-		status.IP = g.getPodIP(pid, status)
-	}
-
-	g.cache.Set(pod.ID, status, err, timestamp)
-	return err
-}
-
-// pkg/kubelet/kuberuntime/kuberuntime_manager.go - GetPodStatus()
-
-// GetPodStatus retrieves the status of the pod, including the
-// information of all containers in the pod that are visible in Runtime.
-func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
-...
-for idx, podSandboxID := range podSandboxIDs {
-	podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
-
-// pkg/kubelet/remote/remote_runtime.go
-
-// PodSandboxStatus returns the status of the PodSandbox.
-func (r *RemoteRuntimeService) PodSandboxStatus(podSandBoxID string) (*runtimeapi.PodSandboxStatus, error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
-	defer cancel()
-
-	resp, err := r.runtimeClient.PodSandboxStatus(ctx, &runtimeapi.PodSandboxStatusRequest{
-		PodSandboxId: podSandBoxID,
-	})
-...
-
-
-```
-
-
-
-[0] `GetPods()` is get the all pods using gRPC client(`runtimeClient`) for container runtime communication.
+* For example, `GetPods()` is get the all pods using remote calls.
 ```go
 // pkg/kubelet/kuberuntime/kuberuntime_manager.go - GetPods()
 
@@ -326,7 +173,188 @@ func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilte
 }
 ```
 
-* `GetPodStatus`
+
+* At this point, time of last relist time updates as current timestamp.
+  In other words, the elasped time in `Healthy()` can be evaluated as starting point at this updated timestamp, if `GetPods()` processed without any latency.
+```go
+	g.updateRelistTime(timestamp)
+```
+
+* All pods gotten from container runtime are setting as current pods, and to compare old and current pods to generate/update related each matched event.
+```go
+	pods := kubecontainer.Pods(podList)
+	g.podRecords.setCurrent(pods)
+
+	// Compare the old and the current pods, and generate events.
+	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
+	for pid := range g.podRecords {
+		oldPod := g.podRecords.getOld(pid)
+		pod := g.podRecords.getCurrent(pid)
+		// Get all containers in the old and the new pod.
+		allContainers := getContainersFromPods(oldPod, pod)
+		for _, container := range allContainers {
+			events := computeEvents(oldPod, pod, &container.ID)
+			for _, e := range events {
+				updateEvents(eventsByPodID, e)
+			}
+		}
+	}
+```
+
+* If there are pods to be updated events and states, the related pod cache should be updated by `updateCache()`.
+```go
+	var needsReinspection map[types.UID]*kubecontainer.Pod
+	if g.cacheEnabled() {
+		needsReinspection = make(map[types.UID]*kubecontainer.Pod)
+	}
+
+	// If there are events associated with a pod, we should update the
+	// podCache.
+	for pid, events := range eventsByPodID {
+		pod := g.podRecords.getCurrent(pid)
+		if g.cacheEnabled() {
+			// updateCache() will inspect the pod and update the cache. If an
+			// error occurs during the inspection, we want PLEG to retry again
+			// in the next relist. To achieve this, we do not update the
+			// associated podRecord of the pod, so that the change will be
+			// detect again in the next relist.
+			// TODO: If many pods changed during the same relist period,
+			// inspecting the pod and getting the PodStatus to update the cache
+			// serially may take a while. We should be aware of this and
+			// parallelize if needed.
+			if err := g.updateCache(pod, pid); err != nil {
+				glog.Errorf("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
+
+				// make sure we try to reinspect the pod during the next relisting
+				needsReinspection[pid] = pod
+
+				continue
+			} else if _, found := g.podsToReinspect[pid]; found {
+				// this pod was in the list to reinspect and we did so because it had[0] `GetPods()` is get the all pods using remote calls.
+```go
+// pkg/kubelet/kuberuntime/kuberuntime_manager.go - GetPods()
+
+// GetPods returns a list of containers grouped by pods. The boolean parameter
+// specifies whether the runtime returns all containers including those already
+// exited and dead containers (used for garbage collection).
+func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
+	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
+	sandboxes, err := m.getKubeletSandboxes(all)
+
+// pkg/kubelet/kuberuntime/kuberuntime_sandbox.go - getKubeletSandboxes()
+
+// getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
+func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi.PodSandbox, error) {
+	var filter *runtimeapi.PodSandboxFilter
+	if !all {
+		readyState := runtimeapi.PodSandboxState_SANDBOX_READY
+		filter = &runtimeapi.PodSandboxFilter{
+			State: &runtimeapi.PodSandboxStateValue{
+				State: readyState,
+			},
+		}
+	}
+
+	resp, err := m.runtimeService.ListPodSandbox(filter)
+	if err != nil {
+		glog.Errorf("ListPodSandbox failed: %v", err)
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// pkg/kubelet/remote/remote_runtime.go - ListPodSandbox()
+
+// ListPodSandbox returns a list of PodSandboxes.
+func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.ListPodSandbox(ctx, &runtimeapi.ListPodSandboxRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		glog.Errorf("ListPodSandbox with filter %+v from runtime service failed: %v", filter, err)
+		return nil, err
+	}
+
+	return resp.Items, nil
+}
+``` events, so remove it
+				// from the list (we don't want the reinspection code below to inspect it a second time in
+				// this relist execution)
+				delete(g.podsToReinspect, pid)
+			}
+		}
+		// Update the internal storage and send out the events.
+		g.podRecords.update(pid)
+		for i := range events {
+			// Filter out events that are not reliable and no other components use yet.
+			if events[i].Type == ContainerChanged {
+				continue
+			}
+			g.eventChannel <- events[i]
+		}
+	}
+```
+
+* Any pods that failed in the previous loop are try to update cache again.
+```go
+	if g.cacheEnabled() {
+		// reinspect any pods that failed inspection during the previous relist
+		if len(g.podsToReinspect) > 0 {
+			glog.V(5).Infof("GenericPLEG: Reinspecting pods that previously failed inspection")
+			for pid, pod := range g.podsToReinspect {
+				if err := g.updateCache(pod, pid); err != nil {
+					glog.Errorf("PLEG: pod %s/%s failed reinspection: %v", pod.Name, pod.Namespace, err)
+					needsReinspection[pid] = pod
+				}
+			}
+		}
+
+		// Update the cache timestamp.  This needs to happen *after*
+		// all pods have been properly updated in the cache.
+		g.cache.UpdateTime(timestamp)
+	}
+
+	// make sure we retain the list of pods that need reinspecting the next time relist is called
+	g.podsToReinspect = needsReinspection
+}
+```
+
+* `updateCache()` called each pod which is changed states with multiple remote calls to update through `GetPodStatus()`.
+```go
+// pkg/kubelet/pleg/generic.go - updateCache()
+
+func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
+	if pod == nil {
+		// The pod is missing in the current relist. This means that
+		// the pod has no visible (active or inactive) containers.
+		glog.V(4).Infof("PLEG: Delete status for pod %q", string(pid))
+		g.cache.Delete(pid)
+		return nil
+	}
+	timestamp := g.clock.Now()
+	// TODO: Consider adding a new runtime method
+	// GetPodStatus(pod *kubecontainer.Pod) so that Docker can avoid listing
+	// all containers again.
+	status, err := g.runtime.GetPodStatus(pod.ID, pod.Name, pod.Namespace)
+	glog.V(4).Infof("PLEG: Write status for %s/%s: %#v (err: %v)", pod.Name, pod.Namespace, status, err)
+	if err == nil {
+		// Preserve the pod IP across cache updates if the new IP is empty.
+		// When a pod is torn down, kubelet may race with PLEG and retrieve
+		// a pod status after network teardown, but the kubernetes API expects
+		// the completed pod's IP to be available after the pod is dead.
+		status.IP = g.getPodIP(pid, status)
+	}
+
+	g.cache.Set(pod.ID, status, err, timestamp)
+	return err
+}
+```
+
+* The `GetPodStatus()` get the information using `PodSandboxStatus()` and `getPodContainerStatuses()` which are calling remote calls.
 ```go
 // pkg/kubelet/kuberuntime/kuberuntime_manager.go - GetPodStatus()
 
@@ -347,54 +375,55 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	// these limitations now.
 	// TODO: move this comment to SyncPod.
 	podSandboxIDs, err := m.getSandboxIDByPodUID(uid, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	podFullName := format.Pod(&v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			UID:       uid,
-		},
-	})
-	glog.V(4).Infof("getSandboxIDByPodUID got sandbox IDs %q for pod %q", podSandboxIDs, podFullName)
-
-	sandboxStatuses := make([]*runtimeapi.PodSandboxStatus, len(podSandboxIDs))
-	podIP := ""
+  ...
 	for idx, podSandboxID := range podSandboxIDs {
 		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
-		if err != nil {
-			glog.Errorf("PodSandboxStatus of sandbox %q for pod %q error: %v", podSandboxID, podFullName, err)
-			return nil, err
-		}
-		sandboxStatuses[idx] = podSandboxStatus
-
-		// Only get pod IP from latest sandbox
-		if idx == 0 && podSandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			podIP = m.determinePodSandboxIP(namespace, name, podSandboxStatus)
-		}
+    ...
 	}
 
 	// Get statuses of all containers visible in the pod.
 	containerStatuses, err := m.getPodContainerStatuses(uid, name, namespace)
-	if err != nil {
-		glog.Errorf("getPodContainerStatuses for pod %q failed: %v", podFullName, err)
-		return nil, err
-	}
-
-	return &kubecontainer.PodStatus{
-		ID:                uid,
-		Name:              name,
-		Namespace:         namespace,
-		IP:                podIP,
-		SandboxStatuses:   sandboxStatuses,
-		ContainerStatuses: containerStatuses,
-	}, nil
+...
 }
 ```
 
+* For example, we can see `GetPodNetworkStatus()` which be included `PodSandboxStatus()` tracestack is getting lock during process either.
+```go
+// pkg/kubelet/dockershim/network/plugins.go
 
+func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
+  defer recordOperation("get_pod_network_status", time.Now())
+  fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
+  pm.podLock(fullPodName).Lock()
+  defer pm.podUnlock(fullPodName)
+
+  netStatus, err := pm.plugin.GetPodNetworkStatus(podNamespace, podName, id)
+  if err != nil {
+    return nil, fmt.Errorf("NetworkPlugin %s failed on the status hook for pod %q: %v", pm.plugin.Name(), fullPodName, err)
+  }
+
+  return netStatus, nil
+}
+```
+
+* For example, `getPodContainerStatuses()` get container list and status using remote calls.
+```go
+// getPodContainerStatuses gets all containers' statuses for the pod.
+func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, name, namespace string) ([]*kubecontainer.ContainerStatus, error) {
+  // Select all containers of the given pod.
+  containers, err := m.runtimeService.ListContainers(&runtimeapi.ContainerFilter{
+    LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(uid)},
+  })
+  ...
+
+  statuses := make([]*kubecontainer.ContainerStatus, len(containers))
+  // TODO: optimization: set maximum number of containers per container name to examine.
+  for i, c := range containers {
+    status, err := m.runtimeService.ContainerStatus(c.Id)
+    ...
+  }
+}
+```
 
 
 

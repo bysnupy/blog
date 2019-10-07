@@ -58,7 +58,7 @@ func (s *runtimeState) runtimeErrors() []string {
 If `Healthy()` is failed, we can see logs like "PLEG is not healthy: pleg was last seen active 3m1.1111s ago; threshold is 3m0s".
 
 
-## Review `relist()`
+## Review relist() function
 I'd like to follow the `relist` to examine why "PLEG is unheathy" happen in the process from now.
 
 * `relist()` is called periodically by goroutine, even though we set the period to 1s(`plegRelistPeriod`), the `relist()` itself can take more than 1s to finish if the container runtime responds slowly and/or when there are many container changes in one cycle. Next `relist()` can call after previous one is complete.

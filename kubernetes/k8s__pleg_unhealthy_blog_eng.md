@@ -5,7 +5,7 @@
 In this article, I'd like to talk about "PLEG is not healthy" issue, which is based on the implementation.
 Let me explain Pod Lifecycle Event Generator(PLEG) simply here, this module in kubelet(Kubernetes) convert the container runtime states with each matched pod-level event and maintain the pod cache up-to-date.
 
-# "PLEG is not healthy": How this issue is triggered ? 
+# "PLEG is not healthy": How does this issue be triggered ? 
 In order to  answer this question, I'd like to walk through a few functions for PLEG health check tasks from now.
 Kubelet keep checking PLEG health by calling `Healthy()` periodically in `SyncLoop()` as follows. 
 

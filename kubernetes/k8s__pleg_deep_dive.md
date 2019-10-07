@@ -59,7 +59,7 @@ If `Healthy()` is failed, we can see logs like "PLEG is not healthy: pleg was la
 
 
 ## Review relist() function
-I'd like to follow the `relist` to examine why "PLEG is unheathy" happen in the process from now.
+I'd like to follow the `relist` to examine why "PLEG is unheathy" happen in the process from now. This source codes are based on Kubernetes 1.11(OpenShift 3.11).
 
 * `relist()` is called periodically by goroutine, even though we set the period to 1s(`plegRelistPeriod`), the `relist()` itself can take more than 1s to finish if the container runtime responds slowly and/or when there are many container changes in one cycle. Next `relist()` can call after previous one is complete.
 

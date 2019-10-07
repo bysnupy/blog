@@ -26,4 +26,4 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 * SyncLoop(): check the PLEG health periodically using `runtimeErrors()` as follows. 
 
 
-![PLEG_process_flow](https://octodex.github.com/images/yaktocat.png)
+![PLEG_process_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/PLEG.png)

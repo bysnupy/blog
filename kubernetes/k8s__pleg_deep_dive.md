@@ -57,6 +57,8 @@ func (s *runtimeState) runtimeErrors() []string {
 
 If `Healthy()` is failed, we can see logs like "PLEG is not healthy: pleg was last seen active 3m1.1111s ago; threshold is 3m0s".
 
+
+## Review `relist()`
 I'd like to follow the `relist` to examine why "PLEG is unheathy" happen in the process from now.
 
 * `relist()` is called periodically by goroutine, even though we set the period to 1s(`plegRelistPeriod`), the `relist()` itself can take more than 1s to finish if the container runtime responds slowly and/or when there are many container changes in one cycle. Next `relist()` can call after previous one is complete.
@@ -425,7 +427,9 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 }
 ```
 
+## Conclusion
 
+PLEG get many information through container runtime, and kubelet runtime request timeout is 2min by default, so I think if there are some unresponsive pods, "PLEG is not healthy" error is triggered. And the update cache is processing through single loop, it takes time the more containers. Additionally the more containers are easy to generate more events, it also take time more to update the caches.
 
 
 [A] Kubelet: Pod Lifecycle Event Generator (PLEG)

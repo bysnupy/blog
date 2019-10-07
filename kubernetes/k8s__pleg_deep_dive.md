@@ -232,58 +232,7 @@ func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilte
 
 				continue
 			} else if _, found := g.podsToReinspect[pid]; found {
-				// this pod was in the list to reinspect and we did so because it had[0] `GetPods()` is get the all pods using remote calls.
-```go
-// pkg/kubelet/kuberuntime/kuberuntime_manager.go - GetPods()
-
-// GetPods returns a list of containers grouped by pods. The boolean parameter
-// specifies whether the runtime returns all containers including those already
-// exited and dead containers (used for garbage collection).
-func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
-	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
-	sandboxes, err := m.getKubeletSandboxes(all)
-
-// pkg/kubelet/kuberuntime/kuberuntime_sandbox.go - getKubeletSandboxes()
-
-// getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
-func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi.PodSandbox, error) {
-	var filter *runtimeapi.PodSandboxFilter
-	if !all {
-		readyState := runtimeapi.PodSandboxState_SANDBOX_READY
-		filter = &runtimeapi.PodSandboxFilter{
-			State: &runtimeapi.PodSandboxStateValue{
-				State: readyState,
-			},
-		}
-	}
-
-	resp, err := m.runtimeService.ListPodSandbox(filter)
-	if err != nil {
-		glog.Errorf("ListPodSandbox failed: %v", err)
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-// pkg/kubelet/remote/remote_runtime.go - ListPodSandbox()
-
-// ListPodSandbox returns a list of PodSandboxes.
-func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
-	defer cancel()
-
-	resp, err := r.runtimeClient.ListPodSandbox(ctx, &runtimeapi.ListPodSandboxRequest{
-		Filter: filter,
-	})
-	if err != nil {
-		glog.Errorf("ListPodSandbox with filter %+v from runtime service failed: %v", filter, err)
-		return nil, err
-	}
-
-	return resp.Items, nil
-}
-``` events, so remove it
+				// this pod was in the list to reinspect and we did so because it had events, so remove it
 				// from the list (we don't want the reinspection code below to inspect it a second time in
 				// this relist execution)
 				delete(g.podsToReinspect, pid)

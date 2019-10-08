@@ -43,6 +43,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 					duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
 					continue
 				}
+		}
 }
 
 // pkg/kubelet/runtime.go - runtimeErrors()

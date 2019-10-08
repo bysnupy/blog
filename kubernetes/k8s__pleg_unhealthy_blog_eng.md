@@ -157,3 +157,8 @@ In my experience and searching, "PLEG is not healthy" can happen various causes 
 - Too many running pods (events and latency is increasing proportionl to the pod numbers.)
 - [Deadlock in PLEG relist](https://github.com/kubergitetes/kubernetes/issues/72482), it fixed at Kubernetes 1.14.
 - CNI bugs when getting a pod network status.
+
+### References
+- [Kubelet: Pod Lifecycle Event Generator (PLEG)](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-lifecycle-event-generator.md)
+- [Kubelet: Runtime Pod Cache](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/runtime-pod-cache.md)
+- [relist() in kubernetes/pkg/kubelet/pleg/generic.go](https://github.com/openshift/origin/blob/release-3.11/vendor/k8s.io/kubernetes/pkg/kubelet/pleg/generic.go#L180-L284)

@@ -30,29 +30,29 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 
 // pkg/kubelet/kubelet.go - NewMainKubelet()
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ... {
-		klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
+	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
 }
 
 // pkg/kubelet/kubelet.go - syncLoop()
 func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHandler) {
-		for {
-				if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
-					glog.Infof("skipping pod synchronization - %v", rs)
-					// exponential backoff
-					time.Sleep(duration)
-					duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
-					continue
-				}
+	for {
+		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
+			glog.Infof("skipping pod synchronization - %v", rs)
+			// exponential backoff
+			time.Sleep(duration)
+			duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
+			continue
 		}
+	}
 }
 
 // pkg/kubelet/runtime.go - runtimeErrors()
 func (s *runtimeState) runtimeErrors() []string {
-		for _, hc := range s.healthChecks {
-			if ok, err := hc.fn(); !ok {
-				ret = append(ret, fmt.Sprintf("%s is not healthy: %v", hc.name, err))
-			}
+	for _, hc := range s.healthChecks {
+		if ok, err := hc.fn(); !ok {
+			ret = append(ret, fmt.Sprintf("%s is not healthy: %v", hc.name, err))
 		}
+	}
 }
 ```
 
@@ -76,7 +76,7 @@ For example, if "relist" takes time 5s to complete, then next relist time is aft
 plegRelistPeriod = time.Second * 1
 
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ... {
-		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
+	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 }
 // pkg/kubelet/pleg/generic.go - Start()
 

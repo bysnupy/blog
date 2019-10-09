@@ -39,7 +39,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ... {
 }
 
 // pkg/kubelet/kubelet.go - syncLoop()
-func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHandler) {
+func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHandler) ... {
 	for {
 		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
 			time.Sleep(duration)
@@ -62,7 +62,7 @@ func (s *runtimeState) runtimeErrors() []string {
 ## Review "relist"
 
 Take a look more details about "relist" function as follows. 
-Specifically look at the remote process calls with other parts and check how to process the getting data,
+Specifically watch out carefully the remote process calls with other parts and check how to process the getting data,
 because those parts are easy to bottleneck usually.
 
 ![PLEG_process_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/PLEG.png)
@@ -88,7 +88,7 @@ func (g *GenericPLEG) Start() {
 	go wait.Until(g.relist, g.relistPeriod, wait.NeverStop)
 }
 func (g *GenericPLEG) relist() {
-...snip...
+... snip ...
 }
 ```
 
@@ -105,7 +105,27 @@ This pods list is using for comparison with previous pods list to check changes 
   }()
   
   // Get all the pods.
-	podList, err := g.runtime.GetPods(true)  
+	podList, err := g.runtime.GetPods(true)
+
+--- Trace GetPods call stacks here
+// pkg/kubelet/kuberuntime/kuberuntime_manager.go - GetPods()
+func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
+	sandboxes, err := m.getKubeletSandboxes(all)
+}
+
+// pkg/kubelet/kuberuntime/kuberuntime_sandbox.go - getKubeletSandboxes()
+// getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
+func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ... {
+	resp, err := m.runtimeService.ListPodSandbox(filter)
+}
+
+// pkg/kubelet/remote/remote_runtime.go - ListPodSandbox()
+// ListPodSandbox returns a list of PodSandboxes.
+func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
+	resp, err := r.runtimeClient.ListPodSandbox(ctx, &runtimeapi.ListPodSandboxRequest{
+		Filter: filter,
+	})
+}
 ```
 
 After getting all pods, last "relist" time is updated as current timestamp. In other words, `Healthy()` can be evaluated by this updated timestamp.

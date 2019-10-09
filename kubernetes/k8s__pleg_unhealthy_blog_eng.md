@@ -12,7 +12,7 @@ and maintain the pod cache up-to-date by applying changes.
 We will take a look around the red dot line part from below process image.
 ![original_pleg_flow_image](https://github.com/bysnupy/blog/blob/master/kubernetes/orig-pleg.png)
 
-This image is from [Kubelet: Pod Lifecycle Event Generator (PLEG)](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-lifecycle-event-generator.md).
+The original image is here: [Kubelet: Pod Lifecycle Event Generator (PLEG)](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-lifecycle-event-generator.md).
 
 ## How does "PLEG is not healthy" happen ?
 Kubelet keeps checking PLEG health by calling `Healthy()` periodically in `SyncLoop()` as follows. 

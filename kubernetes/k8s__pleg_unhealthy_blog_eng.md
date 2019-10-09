@@ -447,8 +447,8 @@ func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id ku
 }
 ```
 
-We has reviewed the "relist" process through related source code and call stack trace.
-I hope you can learn more details about PLEG and how to take/update the required data in the process.
+We have taken a look the "relist" process through related source codes and call stack traces.
+I hope you can understand more details about PLEG and how to take/update the required data in the process.
 
 ## Conclusions
 In my experience and searching, "PLEG is not healthy" can happen various causes as follows.

@@ -12,7 +12,7 @@ and maintain the pod cache up-to-date by applying changes.
 We will take a look around the red dot line part from below process image.
 ![original_pleg_flow_image](https://github.com/bysnupy/blog/blob/master/kubernetes/orig-pleg.png)
 
-The original image is here: [Kubelet: Pod Lifecycle Event Generator (PLEG)](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-lifecycle-event-generator.md).
+This image is from [Kubelet: Pod Lifecycle Event Generator (PLEG)](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-lifecycle-event-generator.md).
 
 ## How does "PLEG is not healthy" happen ?
 Kubelet keeps checking PLEG health by calling `Healthy()` periodically in `SyncLoop()` as follows. 
@@ -447,18 +447,23 @@ func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id ku
 }
 ```
 
-We have taken a look the "relist" process through related source codes and call stack traces.
-I hope you can understand more details about PLEG and how to take/update the required data in the process.
+We have taken a look the "relist" process through related source code and call stack trace.
+I hope you can learn more details about PLEG and how to take/update the required data in the process.
 
 ## Conclusions
-In my experience and searching, "PLEG is not healthy" can happen various causes as follows.
+In my experience and searching, "PLEG is not healthy" can happen various causes, 
+and I think there are many potential causes we do not run into yet for this issue.
+So I'd like to introduce the following issues as samples for your information. 
 
 - Container runtime latency or timeout (performance degradation, deadlock, bugs ...) during remote requests
-- Too many running pods (events and latency is increasing proportionl to the pod numbers.)
-- [Deadlock in PLEG relist](https://github.com/kubergitetes/kubernetes/issues/72482), it fixed at Kubernetes 1.14.
+- Too many running pods for host resources, or too many running pods on high spec hosts to complete the relist within 3 min.
+  As you checked in this post, events and latency is proportional to the pod numbers regardless host resources.
+- [Deadlock in PLEG relist](https://github.com/kubergitetes/kubernetes/issues/72482), it has fixed as of Kubernetes 1.14.
 - CNI bugs when getting a pod network status.
+
 
 ### References
 - [Kubelet: Pod Lifecycle Event Generator (PLEG)](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-lifecycle-event-generator.md)
 - [Kubelet: Runtime Pod Cache](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/runtime-pod-cache.md)
 - [relist() in kubernetes/pkg/kubelet/pleg/generic.go](https://github.com/openshift/origin/blob/release-3.11/vendor/k8s.io/kubernetes/pkg/kubelet/pleg/generic.go#L180-L284)
+- [CNI bug - PLEG is not healthy error, node marked NotReady](https://bugzilla.redhat.com/show_bug.cgi?id=1486914#c16)

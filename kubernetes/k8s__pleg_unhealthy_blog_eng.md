@@ -117,13 +117,13 @@ plegRelistPeriod = time.Second * 1
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ... 
 :
-	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
+  klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 
 //// pkg/kubelet/pleg/generic.go - Start()
 
 // Start spawns a goroutine to relist periodically.
 func (g *GenericPLEG) Start() {
-	go wait.Until(g.relist, g.relistPeriod, wait.NeverStop)
+  go wait.Until(g.relist, g.relistPeriod, wait.NeverStop)
 }
 
 //// pkg/kubelet/pleg/generic.go - relist()

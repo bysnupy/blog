@@ -60,14 +60,14 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
     factor = 2
   )
   duration := base
-	for {
-		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
-			glog.Infof("skipping pod synchronization - %v", rs)
-			// exponential backoff
-			time.Sleep(duration)
-			duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
-			continue
-		}
+  for {
+	  if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
+		  glog.Infof("skipping pod synchronization - %v", rs)
+		  // exponential backoff
+		  time.Sleep(duration)
+		  duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
+		  continue
+	  }
     :
   }
 :
@@ -128,7 +128,7 @@ func (g *GenericPLEG) Start() {
 
 //// pkg/kubelet/pleg/generic.go - relist()
 func (g *GenericPLEG) relist() {
-... We focus here ...
+... WE WILL REVIEW HERE ...
 }
 ```
 

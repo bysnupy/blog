@@ -34,12 +34,12 @@ In addition to I also explain summary before the codes and snipped less importan
 relistThreshold = 3 * time.Minute
 :
 func (g *GenericPLEG) Healthy() (bool, error) {
-	relistTime := g.getRelistTime()
-	elapsed := g.clock.Since(relistTime)
-	if elapsed > relistThreshold {
-		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)
-	}
-	return true, nil
+  relistTime := g.getRelistTime()
+  elapsed := g.clock.Since(relistTime)
+  if elapsed > relistThreshold {
+    return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)
+  }
+  return true, nil
 }
 
 //// pkg/kubelet/kubelet.go - NewMainKubelet()

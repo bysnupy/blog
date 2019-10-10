@@ -23,7 +23,7 @@ If the "relist" process take times more than 3 minutes, "PLEG is not healthy" is
 We got to know the "relist" is key task for this issue at now. 
 I'll walk you through related source codes based on Kubernetes 1.11(OpenShift 3.11) in each part to help your more understanding.
 Don't worry if you are not familiar with Go syntax, it's enough to read comments around codes. 
-In addition to I also snipped less important things from the source codes for readability.
+In addition to I also explain summary before the codes and snipped less important things from the source codes for readability either.
 
 ```go
 //// pkg/kubelet/pleg/generic.go - Healthy()
@@ -45,7 +45,7 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 //// pkg/kubelet/kubelet.go - NewMainKubelet()
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ...
 :
-		klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
+  klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
 
 //// pkg/kubelet/kubelet.go - syncLoop()
 func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHandler) {
@@ -54,33 +54,33 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 // that need to be sync'd. A one-second period is sufficient because the
 // sync interval is defaulted to 10s.
 :
-    const (
-      base   = 100 * time.Millisecond
-      max    = 5 * time.Second
-      factor = 2
-    )
-    duration := base
-		for {
-				if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
-					glog.Infof("skipping pod synchronization - %v", rs)
-					// exponential backoff
-					time.Sleep(duration)
-					duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
-					continue
-				}
-        :
-    }
+  const (
+    base   = 100 * time.Millisecond
+    max    = 5 * time.Second
+    factor = 2
+  )
+  duration := base
+	for {
+		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
+			glog.Infof("skipping pod synchronization - %v", rs)
+			// exponential backoff
+			time.Sleep(duration)
+			duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
+			continue
+		}
+    :
+  }
 :
 }
 
 //// pkg/kubelet/runtime.go - runtimeErrors()
 func (s *runtimeState) runtimeErrors() []string {
 :
-		for _, hc := range s.healthChecks {
-			if ok, err := hc.fn(); !ok {
-				ret = append(ret, fmt.Sprintf("%s is not healthy: %v", hc.name, err))
-			}
+	for _, hc := range s.healthChecks {
+		if ok, err := hc.fn(); !ok {
+			ret = append(ret, fmt.Sprintf("%s is not healthy: %v", hc.name, err))
 		}
+	}
 :
 }
 ```
@@ -117,7 +117,7 @@ plegRelistPeriod = time.Second * 1
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ... 
 :
-		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
+	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 
 //// pkg/kubelet/pleg/generic.go - Start()
 
@@ -128,6 +128,8 @@ func (g *GenericPLEG) Start() {
 
 //// pkg/kubelet/pleg/generic.go - relist()
 func (g *GenericPLEG) relist() {
+... We focus here ...
+}
 ```
 
 The function process starts as recording some metrics for Prometheus, such like `kubelet_pleg_relist_latency_microseconds`.
@@ -256,7 +258,9 @@ The last process is If there are events associated with a pod, we should update 
 so if many pods changed during the same "relist" period this process can be bottleneck.
 Lastly updated new pod lifecycle event is sent to eventChannel after updates.
 
-Tracing call stack is not important, just understand many remote client is called for getting pod inspect information.
+Tracing call stack details are not so important for understanding, 
+just understand some remote clients are called per a pod for getting pod inspect information by conditions.
+I think this way will be increasing latency for proportional to pod numbers, because many pods are generated many events usually.
 
 ```go
 //// pkg/kubelet/pleg/generic.go - relist()
@@ -451,9 +455,9 @@ We have taken a look the "relist" process through related source code and call s
 I hope you can learn more details about PLEG and how to take/update the required data in the process.
 
 ## Conclusions
-In my experience and searching, "PLEG is not healthy" can happen various causes, 
-and I think there are many potential causes we do not run into yet for this issue.
-So I'd like to introduce the following issues as samples for your information. 
+In my experience and searching, "PLEG is not healthy" can be happened by various causes, 
+and I think there are many potential causes we do not run into yet around this issue either.
+So I'd like to introduce the following past and usual cause for your additional information.
 
 - Container runtime latency or timeout (performance degradation, deadlock, bugs ...) during remote requests
 - Too many running pods for host resources, or too many running pods on high spec hosts to complete the relist within 3 min.
@@ -466,4 +470,4 @@ So I'd like to introduce the following issues as samples for your information.
 - [Kubelet: Pod Lifecycle Event Generator (PLEG)](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-lifecycle-event-generator.md)
 - [Kubelet: Runtime Pod Cache](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/runtime-pod-cache.md)
 - [relist() in kubernetes/pkg/kubelet/pleg/generic.go](https://github.com/openshift/origin/blob/release-3.11/vendor/k8s.io/kubernetes/pkg/kubelet/pleg/generic.go#L180-L284)
-- [CNI bug - PLEG is not healthy error, node marked NotReady](https://bugzilla.redhat.com/show_bug.cgi?id=1486914#c16)
+- [Past bug about CNI - PLEG is not healthy error, node marked NotReady](https://bugzilla.redhat.com/show_bug.cgi?id=1486914#c16)

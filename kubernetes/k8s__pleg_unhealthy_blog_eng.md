@@ -1,15 +1,15 @@
 # Title: Understanding "PLEG is not healthy"
 
-In this post, I'd like to talk about "PLEG is not healthy" issue, sometimes which is leading "NodeNotReady" status. 
-As understanding how the PLEG works, it will be helpful for the troubleshooting around this issue.
+In this post, I'd like to talk about the "PLEG is not healthy" issue, which sometimes lead to a "NodeNotReady" status. 
+When understanding how PLEG works, it is helpful to also understand troubleshooting around this issue.
 
 ## What is the PLEG ?
 
-PLEG is stand for Pod Lifecycle Event Generator, 
-this module in kubelet(Kubernetes) convert accordingly the container runtime states with each matched pod-level event,
-and maintain the pod cache up-to-date by applying changes.
+PLEG stands for Pod Lifecycle Event Generator. 
+This module in kubelet(Kubernetes) adjusts the container runtime state with each matched pod-level event,
+and keeps the pod cache up-to-date by applying changes.
 
-We will take a look around the red dot line part from below process image.
+Let's take a look at the dotted red line below in the process image.
 ![original_pleg_flow_image](https://github.com/bysnupy/blog/blob/master/kubernetes/orig-pleg.png)
 
 The original image is here: [Kubelet: Pod Lifecycle Event Generator (PLEG)](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-lifecycle-event-generator.md).
@@ -17,13 +17,12 @@ The original image is here: [Kubelet: Pod Lifecycle Event Generator (PLEG)](http
 ## How does "PLEG is not healthy" happen ?
 Kubelet keeps checking PLEG health by calling `Healthy()` periodically in `SyncLoop()` as follows. 
 
-`Healthy()` checks whether "relist" process(the PLEG key task) completes within 3 minutes.
-This function is added to `runtimeState` as "PLEG", and it's calling periodically from `SyncLoop`(called every 10s by default). 
-If the "relist" process take times more than 3 minutes, "PLEG is not healthy" issue happens through this stack processes.
-We got to know the "relist" is key task for this issue at now. 
-I'll walk you through related source codes based on Kubernetes 1.11(OpenShift 3.11) in each part to help your more understanding.
-Don't worry if you are not familiar with Go syntax, it's enough to read comments around codes. 
-In addition to I also explain summary before the codes and snipped less important things from the source codes for readability either.
+`Healthy()` checks whether the "relist" process(the PLEG key task) completes within 3 minutes.
+This function is added to `runtimeState` as "PLEG", and is called periodically from `SyncLoop`(every 10s by default). 
+If the "relist" process take more than 3 minutes, a "PLEG is not healthy" issue is reported through this stack process.
+Now, I'll walk you through the related source code based on Kubernetes 1.11(OpenShift 3.11) in each part to help your understanding.
+Don't worry if you are not familiar with the Go syntax, as it's enough to read the comments in the code. 
+In addition, I will also explain the summary before the code and snip less important things from the source code for readability.
 
 ```go
 //// pkg/kubelet/pleg/generic.go - Healthy()
@@ -87,18 +86,18 @@ func (s *runtimeState) runtimeErrors() []string {
 
 ## Review "relist"
 
-Take a look more details about "relist" function as follows. 
-Specifically watch out carefully the remote process calls with other parts and check how to process the getting data,
-because those parts are easy to bottleneck usually.
+Let's take a look at more detail about the "relist" function. 
+Specifically, watch carefully for the remote process calls and check how to process the pull data,
+because these parts can easily bottleneck.
 
 ![PLEG_process_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/PLEG.png)
 
-In the same order above flow chart, check the process and implementations in the "relist". Refer [here](https://github.com/openshift/origin/blob/release-3.11/vendor/k8s.io/kubernetes/pkg/kubelet/pleg/generic.go#L180-L284) for full source codes.
+In the above flow chart, you can see the process and implementation of "relist". Refer [here](https://github.com/openshift/origin/blob/release-3.11/vendor/k8s.io/kubernetes/pkg/kubelet/pleg/generic.go#L180-L284) for full source codes.
 
-Even though "relist" is setting as calling every 1s, however itself can take more than 1s to finish, 
-if the container runtime responds slowly and/or when there are many container changes in one cycle.
-So next "relist" can call after previous one is complete. 
-For example, if "relist" takes time 5s to complete, then next relist time is after 6s(1s + 5s).
+Even though "relist" is set as calling every 1s, it can take more than 1s to finish.
+If the container runtime responds slowly and/or when there are many container changes in one cycle.
+So, the next "relist" will call after the previous one is complete. 
+For example, if "relist" takes 5s to complete, then next relist time is 6s(1s + 5s).
 
 ```go
 //// pkg/kubelet/kubelet.go - NewMainKubelet()
@@ -132,9 +131,9 @@ func (g *GenericPLEG) relist() {
 }
 ```
 
-The function process starts as recording some metrics for Prometheus, such like `kubelet_pleg_relist_latency_microseconds`.
-And then take all pods(included stopped pods) list from container runtime using CRI interface for getting current pods status.
-This pods list is using for comparison with previous pods list to check changes and the matched pod-level events are generated along the changed states.
+The function process starts by recording some metrics for Prometheus, such as `kubelet_pleg_relist_latency_microseconds`,
+and then takes all "Pods"(included stopped pods) list from the container runtime using the CRI interface for getting the current Pods status.
+This Pods list is used for comparison with previous pods list to check changes and the matched pod-level events are generated along with the changed states.
 
 ```go
 //// pkg/kubelet/pleg/generic.go - relist()
@@ -152,7 +151,7 @@ This pods list is using for comparison with previous pods list to check changes 
   :
 ```
 
-* Trace `GetPods()` call stack details are here.
+* The trace `GetPods()` call stack details are below.
 ```go
 //// pkg/kubelet/kuberuntime/kuberuntime_manager.go - GetPods()
 
@@ -185,7 +184,7 @@ func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilte
 }
 ```
 
-After getting all pods, last "relist" time is updated as current timestamp. In other words, `Healthy()` can be evaluated by this updated timestamp.
+After getting all Pods, the last "relist" time is updated as current timestamp. In other words, `Healthy()` can be evaluated by using this updated timestamp.
 
 ```go
 //// pkg/kubelet/pleg/generic.go - relist()
@@ -193,8 +192,8 @@ After getting all pods, last "relist" time is updated as current timestamp. In o
   g.updateRelistTime(timestamp)
 ```
 
-As mentioned previously, after comparing between current and previous pods list, 
-every matched pod-level event is generated by the differences/changes between both lists here.
+As mentioned previously, after comparing current and previous Pods list, 
+every matched pod-level event is generated with the differences/changes between both lists below.
 `generateEvents()` generates matched pod-level events, such as "ContainerStarted", "ContainerDied" and so on, and then the events are updated by `updateEvents()`
 
 ```go
@@ -218,7 +217,7 @@ every matched pod-level event is generated by the differences/changes between bo
     }
   }
 ```
-* Trace `computeEvents()` call stack details are here.
+* The trace `computeEvents()` call stack details are below.
 ```go
 //// pkg/kubelet/pleg/generic.go - computeEvents()
 
@@ -253,14 +252,14 @@ func generateEvents(podID types.UID, cid string, oldState, newState plegContaine
 }
 ```
 
-The last process is If there are events associated with a pod, we should update the podCache as follows.
-`updateCache()` will inspect each pod and update it one by one in single loop, 
-so if many pods changed during the same "relist" period this process can be bottleneck.
-Lastly updated new pod lifecycle event is sent to eventChannel after updates.
+The last part of the process checks If there are events associated with a pod, and updates the podCache as follows.
+`updateCache()` will inspect each pod and update it one by one in a single loop, 
+so if many pods changed during the same "relist" period this process can be a bottleneck.
+Lastly, updated new pod lifecycle events are sent to eventChannel after updates.
 
-Tracing call stack details are not so important for understanding, 
-just understand some remote clients are called per a pod for getting pod inspect information by conditions.
-I think this way will be increasing latency for proportional to pod numbers, because many pods are generated many events usually.
+Tracing call stack details are not so important for understanding the process, 
+but some remote clients are called per pod for getting pod inspect information.
+This may increase latency for proportional to pod numbers, because many pods usually generate many events.
 
 ```go
 //// pkg/kubelet/pleg/generic.go - relist()
@@ -297,7 +296,7 @@ I think this way will be increasing latency for proportional to pod numbers, bec
   }
 ```
 
-* Trace `updateCache()` call stack details are here. multiple remote request is called by `GetPodStatus()` for pod inspect.
+* The trace `updateCache()` call stack details are below. Multiple remote requests are called by `GetPodStatus()` for pod inspection.
 ```go
 //// pkg/kubelet/pleg/generic.go - updateCache()
 
@@ -451,18 +450,18 @@ func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id ku
 }
 ```
 
-We have taken a look the "relist" process through related source code and call stack trace.
-I hope you can learn more details about PLEG and how to take/update the required data in the process.
+We have taken a look at the "relist" process through related source code and call stack trace.
+I hope this gives you more details about PLEG and how to update the required data in the process.
 
 ## Conclusions
-In my experience and searching, "PLEG is not healthy" can be happened by various causes, 
-and I think there are many potential causes we do not run into yet around this issue either.
-So I'd like to introduce the following past and usual cause for your additional information.
+In my experience, "PLEG is not healthy" can happen due to various causes, 
+and I also believe there are many potential causes we have not run into yet.
+I'd like to introduce the following past and regular causes for your additional information.
 
 - Container runtime latency or timeout (performance degradation, deadlock, bugs ...) during remote requests
 - Too many running pods for host resources, or too many running pods on high spec hosts to complete the relist within 3 min.
-  As you checked in this post, events and latency is proportional to the pod numbers regardless host resources.
-- [Deadlock in PLEG relist](https://github.com/kubergitetes/kubernetes/issues/72482), it has fixed as of Kubernetes 1.14.
+  As seen in this post, events and latency is proportional to the pod numbers regardless of host resources.
+- [Deadlock in PLEG relist](https://github.com/kubergitetes/kubernetes/issues/72482), has been fixed as of Kubernetes 1.14.
 - CNI bugs when getting a pod network status.
 
 

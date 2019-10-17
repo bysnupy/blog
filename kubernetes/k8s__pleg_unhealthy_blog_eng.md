@@ -101,6 +101,8 @@ If the container runtime responds slowly and/or when there are many container ch
 So, the next "relist" will call after the previous one is complete. 
 For example, if "relist" takes 5s to complete, then next relist time is 6s(1s + 5s).
 
+![PLEG_relist_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-start-relist.png)
+
 ```go
 //// pkg/kubelet/kubelet.go - NewMainKubelet()
 
@@ -154,6 +156,9 @@ This Pods list is used for comparison with previous pods list to check changes a
 ```
 
 * The trace `GetPods()` call stack details are below.
+
+![PLEG_getpods_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-getpods.png)
+
 ```go
 //// pkg/kubelet/kuberuntime/kuberuntime_manager.go - GetPods()
 

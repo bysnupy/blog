@@ -24,7 +24,7 @@ Now, I'll walk you through the related source code based on Kubernetes 1.11(Open
 Don't worry if you are not familiar with the Go syntax, as it's enough to read the comments in the code. 
 In addition, I will also explain the summary before the code and snip less important things from the source code for readability.
 
-![PLEG_healthy_check_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-healthy-check.png)
+![PLEG_healthy_check_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-healthy-checks.png)
 
 ```go
 //// pkg/kubelet/pleg/generic.go - Healthy()

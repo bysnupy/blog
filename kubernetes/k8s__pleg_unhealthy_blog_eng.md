@@ -176,7 +176,7 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
 func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi.PodSandbox, error) {
 :
-	resp, err := m.runtimeService.ListPodSandbox(filter)
+    resp, err := m.runtimeService.ListPodSandbox(filter)
 :
 }
 
@@ -185,9 +185,9 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi
 // ListPodSandbox returns a list of PodSandboxes.
 func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
 :
-	resp, err := r.runtimeClient.ListPodSandbox(ctx, &runtimeapi.ListPodSandboxRequest{
+    resp, err := r.runtimeClient.ListPodSandbox(ctx, &runtimeapi.ListPodSandboxRequest{
 :
-	return resp.Items, nil
+    return resp.Items, nil
 }
 ```
 
@@ -230,32 +230,32 @@ every matched pod-level event is generated with the differences/changes between 
 
 func computeEvents(oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.ContainerID) []*PodLifecycleEvent {
 :
-	return generateEvents(pid, cid.ID, oldState, newState)
+    return generateEvents(pid, cid.ID, oldState, newState)
 }
 
 //// pkg/kubelet/pleg/generic.go - generateEvents()
 
 func generateEvents(podID types.UID, cid string, oldState, newState plegContainerState) []*PodLifecycleEvent {
 :
-	glog.V(4).Infof("GenericPLEG: %v/%v: %v -> %v", podID, cid, oldState, newState)
-	switch newState {
-	case plegContainerRunning:
-		return []*PodLifecycleEvent{{ID: podID, Type: ContainerStarted, Data: cid}}
-	case plegContainerExited:
-		return []*PodLifecycleEvent{{ID: podID, Type: ContainerDied, Data: cid}}
-	case plegContainerUnknown:
-		return []*PodLifecycleEvent{{ID: podID, Type: ContainerChanged, Data: cid}}
-	case plegContainerNonExistent:
-		switch oldState {
-		case plegContainerExited:
-			// We already reported that the container died before.
-			return []*PodLifecycleEvent{{ID: podID, Type: ContainerRemoved, Data: cid}}
-		default:
-			return []*PodLifecycleEvent{{ID: podID, Type: ContainerDied, Data: cid}, {ID: podID, Type: ContainerRemoved, Data: cid}}
-		}
-	default:
-		panic(fmt.Sprintf("unrecognized container state: %v", newState))
-	}
+    glog.V(4).Infof("GenericPLEG: %v/%v: %v -> %v", podID, cid, oldState, newState)
+    switch newState {
+    case plegContainerRunning:
+      return []*PodLifecycleEvent{{ID: podID, Type: ContainerStarted, Data: cid}}
+    case plegContainerExited:
+      return []*PodLifecycleEvent{{ID: podID, Type: ContainerDied, Data: cid}}
+    case plegContainerUnknown:
+      return []*PodLifecycleEvent{{ID: podID, Type: ContainerChanged, Data: cid}}
+    case plegContainerNonExistent:
+      switch oldState {
+      case plegContainerExited:
+        // We already reported that the container died before.
+        return []*PodLifecycleEvent{{ID: podID, Type: ContainerRemoved, Data: cid}}
+      default:
+        return []*PodLifecycleEvent{{ID: podID, Type: ContainerDied, Data: cid}, {ID: podID, Type: ContainerRemoved, Data: cid}}
+      }
+    default:
+      panic(fmt.Sprintf("unrecognized container state: %v", newState))
+  }
 }
 ```
 
@@ -327,6 +327,7 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 // GetPodStatus retrieves the status of the pod, including the
 // information of all containers in the pod that are visible in Runtime.
 func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+  podSandboxIDs, err := m.getSandboxIDByPodUID(uid, nil)
   :
 	for idx, podSandboxID := range podSandboxIDs {
 		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
@@ -337,6 +338,18 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	containerStatuses, err := m.getPodContainerStatuses(uid, name, namespace)
   :
 }
+
+//// pkg/kubelet/kuberuntime/kuberuntime_sandbox.go - getSandboxIDByPodUID()
+
+// getPodSandboxID gets the sandbox id by podUID and returns ([]sandboxID, error).
+// Param state could be nil in order to get all sandboxes belonging to same pod.
+func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID kubetypes.UID, state *runtimeapi.PodSandboxState) ([]string, error) {
+  :
+  sandboxes, err := m.runtimeService.ListPodSandbox(filter)
+  :  
+  return sandboxIDs, nil
+}
+
 
 //// pkg/kubelet/remote/remote_runtime.go - PodSandboxStatus()
 
@@ -356,18 +369,18 @@ func (r *RemoteRuntimeService) PodSandboxStatus(podSandBoxID string) (*runtimeap
 
 // getPodContainerStatuses gets all containers' statuses for the pod.
 func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, name, namespace string) ([]*kubecontainer.ContainerStatus, error) {
-    // Select all containers of the given pod.
-    containers, err := m.runtimeService.ListContainers(&runtimeapi.ContainerFilter{
-        LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(uid)},
-    })
+  // Select all containers of the given pod.
+  containers, err := m.runtimeService.ListContainers(&runtimeapi.ContainerFilter{
+    LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(uid)},
+  })
+  :
+  // TODO: optimization: set maximum number of containers per container name to examine.
+  for i, c := range containers {
+    status, err := m.runtimeService.ContainerStatus(c.Id)
     :
-    // TODO: optimization: set maximum number of containers per container name to examine.
-    for i, c := range containers {
-        status, err := m.runtimeService.ContainerStatus(c.Id)
-        :
-    }
-    :
-    return statuses, nil
+  }
+  :
+  return statuses, nil
 }   
 ```
 

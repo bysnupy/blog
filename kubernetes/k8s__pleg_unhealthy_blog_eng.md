@@ -304,6 +304,9 @@ This may increase latency for proportional to pod numbers, because many pods usu
 ```
 
 * The trace `updateCache()` call stack details are below. Multiple remote requests are called by `GetPodStatus()` for pod inspection.
+
+![PLEG_updatecache_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-updatecache.png)
+
 ```go
 //// pkg/kubelet/pleg/generic.go - updateCache()
 
@@ -349,112 +352,23 @@ func (r *RemoteRuntimeService) PodSandboxStatus(podSandBoxID string) (*runtimeap
 	return resp.Status, nil
 }
 
-//// pkg/kubelet/dockershim/docker_sandbox.go - PodSandBoxStatus()
+//// pkg/kubelet/kuberuntime/kuberuntime_container.go - getPodContainerStatuses()
 
-// PodSandboxStatus returns the status of the PodSandbox.
-func (ds *dockerService) PodSandboxStatus(ctx context.Context, req *runtimeapi.PodSandboxStatusRequest) (*runtimeapi.PodSandboxStatusResponse, error) {
-	podSandboxID := req.PodSandboxId
-
-	r, metadata, err := ds.getPodSandboxDetails(podSandboxID)
-  :
-	var IP string
-	// TODO: Remove this when sandbox is available on windows
-	// This is a workaround for windows, where sandbox is not in use, and pod IP is determined through containers belonging to the Pod.
-	if IP = ds.determinePodIPBySandboxID(podSandboxID); IP == "" {
-		IP = ds.getIP(podSandboxID, r)
-	}
-
-	labels, annotations := extractLabels(r.Config.Labels)
-	status := &runtimeapi.PodSandboxStatus{
-		Id:          r.ID,
-		State:       state,
-		CreatedAt:   ct,
-		Metadata:    metadata,
-		Labels:      labels,
-		Annotations: annotations,
-		Network: &runtimeapi.PodSandboxNetworkStatus{
-			Ip: IP,
-		},
-		Linux: &runtimeapi.LinuxPodSandboxStatus{
-			Namespaces: &runtimeapi.Namespace{
-				Options: &runtimeapi.NamespaceOption{
-					Network: networkNamespaceMode(r),
-					Pid:     pidNamespaceMode(r),
-					Ipc:     ipcNamespaceMode(r),
-				},
-			},
-		},
-	}
-	return &runtimeapi.PodSandboxStatusResponse{Status: status}, nil
-}
-
-//// pkg/kubelet/dockershim/docker_sandbox.go - getPodSandboxDetails()
-
-// Returns the inspect container response, the sandbox metadata, and network namespace mode
-func (ds *dockerService) getPodSandboxDetails(podSandboxID string) (*dockertypes.ContainerJSON, *runtimeapi.PodSandboxMetadata, error) {
-	resp, err := ds.client.InspectContainer(podSandboxID)
-  :
-	return resp, metadata, nil
-}
-
-//// pkg/kubelet/dockershim/libdocker/kube_docker_client.go - InspectContainer()
-func (d *kubeDockerClient) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
-	ctx, cancel := d.getTimeoutContext()
-	defer cancel()
-	containerJSON, err := d.client.ContainerInspect(ctx, id)
-  :
-	return &containerJSON, nil
-}
-
-// getIP returns the ip given the output of `docker inspect` on a pod sandbox,
-// first interrogating any registered plugins, then simply trusting the ip
-// in the sandbox itself. We look for an ipv4 address before ipv6.
-func (ds *dockerService) getIP(podSandboxID string, sandbox *dockertypes.ContainerJSON) string {
-	if sandbox.NetworkSettings == nil {
-		return ""
-	}
-	if networkNamespaceMode(sandbox) == runtimeapi.NamespaceMode_NODE {
-		// For sandboxes using host network, the shim is not responsible for
-		// reporting the IP.
-		return ""
-	}
-
-	// Don't bother getting IP if the pod is known and networking isn't ready
-	ready, ok := ds.getNetworkReady(podSandboxID)
-	if ok && !ready {
-		return ""
-	}
-
-	ip, err := ds.getIPFromPlugin(sandbox)
-	if err == nil {
-		return ip
-	}
-  :
-}
-
-//// pkg/kubelet/dockershim/docker_sandbox.go - getIPFromPlugin()
-
-// getIPFromPlugin interrogates the network plugin for an IP.
-func (ds *dockerService) getIPFromPlugin(sandbox *dockertypes.ContainerJSON) (string, error) {
-  :
-	networkStatus, err := ds.network.GetPodNetworkStatus(metadata.Namespace, metadata.Name, cID)
-  :
-	return networkStatus.IP.String(), nil
-}
-
-//// pkg/kubelet/dockershim/network/plugins.go - GetPodNetworkStatus()
-
-func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
-  defer recordOperation("get_pod_network_status", time.Now())
-  fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
-  pm.podLock(fullPodName).Lock()
-  defer pm.podUnlock(fullPodName)
-
-  netStatus, err := pm.plugin.GetPodNetworkStatus(podNamespace, podName, id)
-  :
-
-  return netStatus, nil
-}
+// getPodContainerStatuses gets all containers' statuses for the pod.
+func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, name, namespace string) ([]*kubecontainer.ContainerStatus, error) {
+    // Select all containers of the given pod.
+    containers, err := m.runtimeService.ListContainers(&runtimeapi.ContainerFilter{
+        LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(uid)},
+    })
+    :
+    // TODO: optimization: set maximum number of containers per container name to examine.
+    for i, c := range containers {
+        status, err := m.runtimeService.ContainerStatus(c.Id)
+        :
+    }
+    :
+    return statuses, nil
+}   
 ```
 
 We have taken a look at the "relist" process through related source code and call stack trace.

@@ -15,10 +15,10 @@ Let's take a look at the dotted red line below in the process image.
 The original image is here: [Kubelet: Pod Lifecycle Event Generator (PLEG)](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/pod-lifecycle-event-generator.md).
 
 ## How does "PLEG is not healthy" happen ?
-Kubelet keeps checking PLEG health by calling `Healthy()` periodically in `SyncLoop()` as follows. 
+Kubelet keeps checking PLEG health by calling "Healthy()" periodically in "SyncLoop()" as follows. 
 
-`Healthy()` checks whether the "relist" process(the PLEG key task) completes within 3 minutes.
-This function is added to `runtimeState` as "PLEG", and is called periodically from `SyncLoop`(every 10s by default). 
+"Healthy()" checks whether the "relist" process(the PLEG key task) completes within 3 minutes.
+This function is added to "runtimeState" as "PLEG", and is called periodically from "SyncLoop"(every 10s by default). 
 If the "relist" process take more than 3 minutes, a "PLEG is not healthy" issue is reported through this stack process.
 Now, I'll walk you through the related source code based on Kubernetes 1.11(OpenShift 3.11) in each part to help your understanding.
 Don't worry if you are not familiar with the Go syntax, as it's enough to read the comments in the code. 
@@ -135,7 +135,7 @@ func (g *GenericPLEG) relist() {
 }
 ```
 
-The function process starts by recording some metrics for Prometheus, such as `kubelet_pleg_relist_latency_microseconds`,
+The function process starts by recording some metrics for Prometheus, such as "kubelet_pleg_relist_latency_microseconds",
 and then takes all "Pods"(included stopped pods) list from the container runtime using the CRI interface for getting the current Pods status.
 This Pods list is used for comparison with previous pods list to check changes and the matched pod-level events are generated along with the changed states.
 
@@ -155,7 +155,7 @@ This Pods list is used for comparison with previous pods list to check changes a
   :
 ```
 
-* The trace `GetPods()` call stack details are below.
+* The trace "GetPods()" call stack details are below.
 
 ![PLEG_getpods_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-getpods.png)
 
@@ -191,7 +191,7 @@ func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilte
 }
 ```
 
-After getting all Pods, the last "relist" time is updated as current timestamp. In other words, `Healthy()` can be evaluated by using this updated timestamp.
+After getting all Pods, the last "relist" time is updated as current timestamp. In other words, "Healthy()" can be evaluated by using this updated timestamp.
 
 ```go
 //// pkg/kubelet/pleg/generic.go - relist()
@@ -201,7 +201,7 @@ After getting all Pods, the last "relist" time is updated as current timestamp. 
 
 As mentioned previously, after comparing current and previous Pods list, 
 every matched pod-level event is generated with the differences/changes between both lists below.
-`generateEvents()` generates matched pod-level events, such as "ContainerStarted", "ContainerDied" and so on, and then the events are updated by `updateEvents()`
+"generateEvents()" generates matched pod-level events, such as "ContainerStarted", "ContainerDied" and so on, and then the events are updated by "updateEvents()".
 
 ```go
 //// pkg/kubelet/pleg/generic.go - relist()
@@ -260,7 +260,7 @@ func generateEvents(podID types.UID, cid string, oldState, newState plegContaine
 ```
 
 The last part of the process checks If there are events associated with a pod, and updates the podCache as follows.
-`updateCache()` will inspect each pod and update it one by one in a single loop, 
+"updateCache()" will inspect each pod and update it one by one in a single loop, 
 so if many pods changed during the same "relist" period this process can be a bottleneck.
 Lastly, updated new pod lifecycle events are sent to eventChannel after updates.
 
@@ -303,7 +303,7 @@ This may increase latency for proportional to pod numbers, because many pods usu
   }
 ```
 
-* The trace `updateCache()` call stack details are below. Multiple remote requests are called by `GetPodStatus()` for pod inspection.
+* The trace "updateCache()" call stack details are below. Multiple remote requests are called by "GetPodStatus()" for pod inspection.
 
 ![PLEG_updatecache_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-updatecache.png)
 

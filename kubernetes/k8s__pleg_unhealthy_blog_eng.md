@@ -387,6 +387,78 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 We have taken a look at the "relist" process through related source code and call stack trace.
 I hope this gives you more details about PLEG and how to update the required data in the process.
 
+## Monitoring "relist"
+
+We can monitor the "relist" latency using kubelet metrics.
+The "relist" period is 1 second, in other words relist complete time(kubelet_pleg_relist_latency_microseconds) + 1 second is "kubelet_pleg_relist_interval_microseconds".
+And you can monitor how long each operation will take in container runtime. These metrics are also helpful to troubleshoot.
+
+Metric | Description | As of Kubernetes 1.14(OpenShift 4.2)
+-|-|-
+kubelet_pleg_relist_interval_microseconds|Interval in microseconds between "relist" calls | kubelet_pleg_relist_interval_seconds
+kubelet_pleg_relist_latency_microseconds|Latency in microseconds for "relist" | kubelet_pleg_relist_duration_seconds
+kubelet_runtime_operations|Cumulative number of runtime operations by operation type| kubelet_runtime_operations_total
+kubelet_runtime_operations_latency_microseconds|Latency in microseconds of runtime operations. Broken down by operation type| kubelet_runtime_operations_duration_seconds
+
+You can take the metrics using "https://<nodehost>:10250/metrics" or your Prometheus monitoring. 
+```command
+# HELP kubelet_pleg_relist_interval_microseconds Interval in microseconds between relisting in PLEG.
+# TYPE kubelet_pleg_relist_interval_microseconds summary
+kubelet_pleg_relist_interval_microseconds{quantile="0.5"} 1.054052e+06
+kubelet_pleg_relist_interval_microseconds{quantile="0.9"} 1.074873e+06
+kubelet_pleg_relist_interval_microseconds{quantile="0.99"} 1.126039e+06
+kubelet_pleg_relist_interval_microseconds_count 5146
+
+# HELP kubelet_pleg_relist_latency_microseconds Latency in microseconds for relisting pods in PLEG.
+# TYPE kubelet_pleg_relist_latency_microseconds summary
+kubelet_pleg_relist_latency_microseconds{quantile="0.5"} 53438
+kubelet_pleg_relist_latency_microseconds{quantile="0.9"} 74396
+kubelet_pleg_relist_latency_microseconds{quantile="0.99"} 115232
+kubelet_pleg_relist_latency_microseconds_count 5106
+
+# HELP kubelet_runtime_operations Cumulative number of runtime operations by operation type.
+# TYPE kubelet_runtime_operations counter
+kubelet_runtime_operations{operation_type="container_status"} 472
+kubelet_runtime_operations{operation_type="create_container"} 93
+kubelet_runtime_operations{operation_type="exec"} 1
+kubelet_runtime_operations{operation_type="exec_sync"} 533
+kubelet_runtime_operations{operation_type="image_status"} 579
+kubelet_runtime_operations{operation_type="list_containers"} 10249
+kubelet_runtime_operations{operation_type="list_images"} 782
+kubelet_runtime_operations{operation_type="list_podsandbox"} 10154
+kubelet_runtime_operations{operation_type="podsandbox_status"} 315
+kubelet_runtime_operations{operation_type="pull_image"} 57
+kubelet_runtime_operations{operation_type="remove_container"} 49
+kubelet_runtime_operations{operation_type="run_podsandbox"} 28
+kubelet_runtime_operations{operation_type="start_container"} 93
+kubelet_runtime_operations{operation_type="status"} 1116
+kubelet_runtime_operations{operation_type="stop_container"} 9
+kubelet_runtime_operations{operation_type="stop_podsandbox"} 33
+kubelet_runtime_operations{operation_type="version"} 564
+
+# HELP kubelet_runtime_operations_latency_microseconds Latency in microseconds of runtime operations. Broken down by operation type.
+# TYPE kubelet_runtime_operations_latency_microseconds summary
+kubelet_runtime_operations_latency_microseconds{operation_type="container_status",quantile="0.5"} 12117
+kubelet_runtime_operations_latency_microseconds{operation_type="container_status",quantile="0.9"} 26607
+kubelet_runtime_operations_latency_microseconds{operation_type="container_status",quantile="0.99"} 27598
+kubelet_runtime_operations_latency_microseconds_count{operation_type="container_status"} 486
+kubelet_runtime_operations_latency_microseconds{operation_type="list_containers",quantile="0.5"} 29972
+kubelet_runtime_operations_latency_microseconds{operation_type="list_containers",quantile="0.9"} 47907
+kubelet_runtime_operations_latency_microseconds{operation_type="list_containers",quantile="0.99"} 80982
+kubelet_runtime_operations_latency_microseconds_count{operation_type="list_containers"} 10812
+kubelet_runtime_operations_latency_microseconds{operation_type="list_podsandbox",quantile="0.5"} 18053
+kubelet_runtime_operations_latency_microseconds{operation_type="list_podsandbox",quantile="0.9"} 28116
+kubelet_runtime_operations_latency_microseconds{operation_type="list_podsandbox",quantile="0.99"} 68748
+kubelet_runtime_operations_latency_microseconds_count{operation_type="list_podsandbox"} 10712
+kubelet_runtime_operations_latency_microseconds{operation_type="podsandbox_status",quantile="0.5"} 4918
+kubelet_runtime_operations_latency_microseconds{operation_type="podsandbox_status",quantile="0.9"} 15671
+kubelet_runtime_operations_latency_microseconds{operation_type="podsandbox_status",quantile="0.99"} 18398
+kubelet_runtime_operations_latency_microseconds_count{operation_type="podsandbox_status"} 323
+```
+
+![original_pleg_flow_image](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-prometheus.png)
+
+
 ## Conclusions
 In my experience, "PLEG is not healthy" can happen due to various causes, 
 and I also believe there are many potential causes we have not run into yet.
@@ -395,7 +467,7 @@ I'd like to introduce the following past and regular causes for your additional 
 - Container runtime latency or timeout (performance degradation, deadlock, bugs ...) during remote requests
 - Too many running pods for host resources, or too many running pods on high spec hosts to complete the relist within 3 min.
   As seen in this post, events and latency is proportional to the pod numbers regardless of host resources.
-- [Deadlock in PLEG relist](https://github.com/kubergitetes/kubernetes/issues/72482), has been fixed as of Kubernetes 1.14.
+- [Deadlock in PLEG relist](https://github.com/kubergitetes/kubernetes/issues/72482), has been fixed as of Kubernetes 1.14(OpenShift 4.2).
 - CNI bugs when getting a pod network status.
 
 

@@ -456,7 +456,7 @@ kubelet_runtime_operations_latency_microseconds{operation_type="podsandbox_statu
 kubelet_runtime_operations_latency_microseconds_count{operation_type="podsandbox_status"} 323
 ```
 
-![original_pleg_flow_image](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-prometheus.png)
+![original_pleg_flow_image](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-prometheus-metrics.png)
 
 
 ## Conclusions

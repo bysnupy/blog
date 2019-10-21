@@ -92,7 +92,7 @@ Let's take a look at more detail about the "relist" function.
 Specifically, watch carefully for the remote process calls and check how to process the pull data,
 because these parts can easily bottleneck.
 
-![PLEG_process_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/PLEG.png)
+![PLEG_process_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-flow.png)
 
 In the above flow chart, you can see the process and implementation of "relist". Refer [here](https://github.com/openshift/origin/blob/release-3.11/vendor/k8s.io/kubernetes/pkg/kubelet/pleg/generic.go#L180-L284) for full source codes.
 
@@ -101,7 +101,7 @@ If the container runtime responds slowly and/or when there are many container ch
 So, the next "relist" will call after the previous one is complete. 
 For example, if "relist" takes 5s to complete, then next relist time is 6s(1s + 5s).
 
-![PLEG_relist_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-start-relist.png)
+![pleg_relist_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-start-relist.png)
 
 ```go
 //// pkg/kubelet/kubelet.go - NewMainKubelet()
@@ -135,7 +135,7 @@ func (g *GenericPLEG) relist() {
 }
 ```
 
-The function process starts by recording some metrics for Prometheus, such as "kubelet_pleg_relist_latency_microseconds",
+The function process starts by recording some metrics for Kubelet, such as "kubelet_pleg_relist_latency_microseconds",
 and then takes all "Pods"(included stopped pods) list from the container runtime using the CRI interface for getting the current Pods status.
 This Pods list is used for comparison with previous pods list to check changes and the matched pod-level events are generated along with the changed states.
 

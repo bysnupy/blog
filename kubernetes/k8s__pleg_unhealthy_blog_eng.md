@@ -92,7 +92,7 @@ Let's take a look at more detail about the "relist" function.
 Specifically, watch carefully for the remote process calls and check how to process the pull data,
 because these parts can easily bottleneck.
 
-![PLEG_process_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-flow.png)
+![PLEG_process](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-process.png)
 
 In the above flow chart, you can see the process and implementation of "relist". Refer [here](https://github.com/openshift/origin/blob/release-3.11/vendor/k8s.io/kubernetes/pkg/kubelet/pleg/generic.go#L180-L284) for full source codes.
 

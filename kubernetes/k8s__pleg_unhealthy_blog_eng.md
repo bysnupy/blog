@@ -455,9 +455,9 @@ kubelet_runtime_operations_latency_microseconds{operation_type="podsandbox_statu
 kubelet_runtime_operations_latency_microseconds{operation_type="podsandbox_status",quantile="0.99"} 18398
 kubelet_runtime_operations_latency_microseconds_count{operation_type="podsandbox_status"} 323
 ```
+Above metrics can monitor using Prometheus by default on OpenShift.
 
 ![original_pleg_flow_image](https://github.com/bysnupy/blog/blob/master/kubernetes/pleg-prometheus-metrics.png)
-
 
 ## Conclusions
 In my experience, "PLEG is not healthy" can happen due to various causes, 

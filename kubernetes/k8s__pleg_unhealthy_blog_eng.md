@@ -400,7 +400,7 @@ kubelet_pleg_relist_latency_microseconds|Latency in microseconds for "relist" | 
 kubelet_runtime_operations|Cumulative number of runtime operations by operation type| kubelet_runtime_operations_total
 kubelet_runtime_operations_latency_microseconds|Latency in microseconds of runtime operations. Broken down by operation type| kubelet_runtime_operations_duration_seconds
 
-You can take the metrics using "https://<nodehost>:10250/metrics" or your Prometheus monitoring. 
+You can take the metrics using "https://127.0.0.1:10250/metrics" on the node host.
 ```command
 # HELP kubelet_pleg_relist_interval_microseconds Interval in microseconds between relisting in PLEG.
 # TYPE kubelet_pleg_relist_interval_microseconds summary

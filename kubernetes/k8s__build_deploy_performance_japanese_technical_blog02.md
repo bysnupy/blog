@@ -4,7 +4,7 @@ Red HatのDaein(デイン)です。OpenShift環境でビルド及デプロイの
 OpenShiftでは次の通りソースコードをビルドして新しいイメージを作成し、そのイメージを用いて新しいPodをデプロイしています。
 
 - 全体プロセスをシンプルに表現した図は次の通りになります。
-![build_deploy_process](https://github.com/bysnupy/blog/blob/master/kubernetes/k8s__build_deploy_performance.png)
+![build_deploy_process](https://github.com/bysnupy/blog/blob/master/kubernetes/build_deploy_performance.png)
 
 ビルドとデプロイ時間に影響する要素としては次のものが考えられます。
 

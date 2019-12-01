@@ -71,7 +71,8 @@ Node:               worker-0.ocp.example.local/x.x.x.x
 # oc get pod test-5-8z5lq -o yaml | grep -E '^  uid:'
   uid: YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY
  
-# cat /sys/fs/cgroup/cpu,cpuacct/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-podYYYYYYYY_YYYY_YYYY_YYYY_YYYYYYYYYYYY.slice/crio-XXX... Container ID ...XXX.scope/cpu.shares
+worker-0 ~# cat \
+/sys/fs/cgroup/cpu,cpuacct/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-podYYYYYYYY_YYYY_YYYY_YYYY_YYYYYYYYYYYY.slice/crio-XXX... Container ID ...XXX.scope/cpu.shares
 32
 ```
 

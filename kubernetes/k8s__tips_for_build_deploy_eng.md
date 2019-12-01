@@ -16,7 +16,7 @@ usually main processes for build and deployment depend on own configuration and 
 We can split into each process by what component have responsibility to manage as follows.
 
 Responsibility                 |  Component
----------------------------------------------------------------------
+-------------------------------|--------------------------------------
 Schedule and Control a Pod     |  Kubernetes
 Manage images                  |  Image Registry
 Build image for an application |  build Pod

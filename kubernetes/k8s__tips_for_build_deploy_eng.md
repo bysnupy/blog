@@ -77,5 +77,74 @@ worker-0 ~# cat \
 ```
 
 Additionally, you should add `kube-reserved` and `system-reserved` to provide more reliable scheduling and minimize node resource overcommitment in all nodes.
+Refer [Allocating resources for nodes in an OpenShift Container Platform cluster](https://docs.openshift.com/container-platform/4.2/nodes/nodes/nodes-nodes-resources-configuring.html) for more details.
 
-## Image Regisry
+```yaml
+apiVersion: machineconfiguration.openshift.io/v1
+kind: KubeletConfig
+metadata:
+  name: set-allocatable
+spec:
+  machineConfigPoolSelector:
+    matchLabels:
+      custom-kubelet: small-pods
+  kubeletConfig:
+    systemReserved:
+      cpu: 500m
+      memory: 512Mi
+    kubeReserved:
+      cpu: 500m
+      memory: 512Mi
+```
+
+## Image Registry
+
+This component work on image push and pull tasks by build and deployment.
+First of all, you should consider to adopt appropriate storage and network enough to
+process required traffic and IO for maximum concurrent image pull and push you assumed.
+Usually object storage is recommended,
+because it is atomic, meaning the data is either written completely or not written at all, even if there is a failure during the write.
+And it can share a volume with other duplicated registry as RWX(ReadWriteMany) mode.
+Further information is here:[Recommended configurable storage technology](https://docs.openshift.com/container-platform/4.2/scalability_and_performance/optimizing-storage.html#recommended-configurable-storage-technology_persistent-storage).
+You can also consider `ImagePullPolicy` to reduce pull/push workload as follows.
+
+* [Image pull policy](https://docs.openshift.com/container-platform/4.2/openshift_images/managing-images/image-pull-policy.html)
+Value | Description
+-|-
+Always | Always pull the image.
+IfNotPresent | Only pull the image if it does not already exist on the node.
+Never | Never pull the image.
+
+## Build Pod
+
+When build Pod is created and start to build application, all control passes to the build Pod,
+and work through build configurations are defined by a `BuildConfig`.
+Depending on how you choose to create your application and how to provide source content to build and operate on affect build performance.
+For instance, if you build Java or nodejs application using `maven` or `npm`, you may download many libraries from their external repositories.
+At that time the repositories or access path have some performance issue, then the build process will be failed or delayed more than usual time.
+It means if your build depend on external service or resource, it's easy to affect from that regardless of your system status.
+So you can consider to create local repository (maven, npm, git and so on) for reliable and stable performance for build.
+Or you can reuse previously downloaded dependencies, previously built artifacts as using Source-to-Image (S2I) incremental builds, 
+if your image registry performance is enough to pull previously-built images for every incremental builds.
+
+* [Performing Source-to-Image (S2I) incremental builds](https://docs.openshift.com/container-platform/4.2/builds/build-strategies.html#builds-strategy-s2i-incremental-builds_build-strategies)
+```yaml
+strategy:
+  sourceStrategy:
+    from:
+      kind: "ImageStreamTag"
+      name: "incremental-image:latest" 
+    incremental: true
+```
+
+**TODO: docker image layerd cache**
+
+You should check build logs for troubleshooting in build process, because Kubernetes can only detect build Pod is complete successfully or not.
+
+## Application Pod
+
+In this process, all controls passes to the application Pod, when application Pod is created, and work through application implementation.
+The application may require external services and resources to initialize, such as DB connection pooling, KVS and other API.
+For instance, if DB server that is required to connection pooling have performance issues or reach the maximum connection count, 
+the application Pod initialization can delay more than you expected. 
+If your application have external dependencies, you also check them whether they are running well.

@@ -109,6 +109,7 @@ Further information is here:[Recommended configurable storage technology](https:
 You can also consider `ImagePullPolicy` to reduce pull/push workload as follows.
 
 * [Image pull policy](https://docs.openshift.com/container-platform/4.2/openshift_images/managing-images/image-pull-policy.html)
+
 Value | Description
 -|-
 Always | Always pull the image.

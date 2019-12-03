@@ -193,6 +193,5 @@ you may need to evaluate what count concurrent build and deployment tasks is ava
 
 We took a look how each part affect each other within build and deployment processes.
 You may already know each configuration I introduced above and it's nothing special.
-As I introduced the configuration and information set for only build and deployment performance topic, 
-I'd like to help your understanding about interaction on the build and deployment here. 
-I hope it's helpful for your stable system management. Thank you for reading this article.
+As I introduced the configuration and information set for only build and deployment performance topic for help your understanding about interaction on the build and deployment here. 
+I hope it's helpful for your stable system management. Thank you for reading.

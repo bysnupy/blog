@@ -97,7 +97,7 @@ spec:
       memory: 512Mi
 ```
 
-If you have more nodes than 1000, you can consider to tune [percentageOfNodesToScore](https://kubernetes.io/docs/concepts/scheduling/scheduler-perf-tuning/) for scheduler performance tuning, 
+If you have more than 1000 nodes, you can consider to tune [percentageOfNodesToScore](https://kubernetes.io/docs/concepts/scheduling/scheduler-perf-tuning/) for scheduler performance tuning, 
 this feature state is beta as of Kubernetes 1.14(OpenShift 4.2).
 
 ## Image Registry

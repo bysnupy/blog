@@ -97,6 +97,9 @@ spec:
       memory: 512Mi
 ```
 
+If you have more nodes than 1000, you can consider to tune [percentageOfNodesToScore](https://kubernetes.io/docs/concepts/scheduling/scheduler-perf-tuning/) for scheduler performance tuning, 
+this feature state is beta as of Kubernetes 1.14(OpenShift 4.2).
+
 ## Image Registry
 
 This component work on image push and pull tasks by build and deployment.
@@ -144,8 +147,52 @@ You should check build logs for troubleshooting in build process, because Kubern
 
 ## Application Pod
 
-In this process, all controls passes to the application Pod, when application Pod is created, and work through application implementation.
-The application may require external services and resources to initialize, such as DB connection pooling, KVS and other API.
-For instance, if DB server that is required to connection pooling have performance issues or reach the maximum connection count, 
-the application Pod initialization can delay more than you expected. 
-If your application have external dependencies, you also check them whether they are running well.
+Like the Build Pod, all controls passes to the application Pod, when application Pod is created, and work through application implementation.
+If the application depends on external services and resources to initialize, such as DB connection pooling, KVS and other API connections.
+For instance, if DB server that is required to connection pooling have performance issues or reach the maximum connection count while application Pod is starting, 
+the application Pod initialization can delay more than you expected, so if your application have external dependencies, you also check them whether they are running well.
+And if `Readiness Probes` and `Liveness Probes` is configured for your application Pod, you should set `initialDelaySeconds` and `periodSeconds` enough to your application Pod initialized.
+If it's too short `initialDeplaySeonds` and `periodSeconds` to check the application states, your application will be restarted uselessly, it result in delay to deploy application Pod.
+
+* [Monitoring container health](https://docs.openshift.com/container-platform/4.2/nodes/containers/nodes-containers-health.html)
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    test: liveness
+  name: liveness-http
+spec:
+  containers:
+  - name: liveness-http
+    image: k8s.gcr.io/liveness 
+    args:
+    - /server
+    livenessProbe: 
+      httpGet:   
+        # host: my-host
+        # scheme: HTTPS
+        path: /healthz
+        port: 8080
+        httpHeaders:
+        - name: X-Custom-Header
+          value: Awesome
+      initialDelaySeconds: 15  
+      timeoutSeconds: 1   
+    name: liveness
+```
+
+## Build and Deployment in parallel
+
+Lastly, I recommend to keep concurrent build and deployment tasks in one cycle as appropriate numbers for suppressing resource issues. 
+As you seen here, these tasks are chained with other tasks and it will iterate automatically through their lifecycles, 
+so it would happen more workload than you expected. Usually compile(build) and application initialization(deployment) process is a CPU aggressive task, 
+you may need to evaluate what count concurrent build and deployment tasks is available and stable on your cluster before scheduling their tasks.
+
+## Conclusion
+
+We took a look how each part affect each other within build and deployment processes.
+You may already know each configuration I introduced above and it's nothing special.
+As I introduced the configuration and information set for only build and deployment performance topic, 
+I'd like to help your understanding about interaction on the build and deployment here. 
+I hope it's helpful for your stable system management. Thank you for reading this article.

@@ -108,7 +108,7 @@ Always|Always pull the image.
 IfNotPresent|Only pull the image if it does not already exist on the node.
 Never|Never pull the image
 
-##Build Pod
+## Build Pod
 
 When build Pod is created and start to build application, all control passes to the build Pod, and work through build configurations are defined by a `BuildConfig`.
 Depending on how you choose to create your application and how to provide source content to build and operate on affect build performance.

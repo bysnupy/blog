@@ -1,13 +1,12 @@
 # How to keep build and deployment stable performance on OpenShift ?
 
-In this article, I will introduce some helpful common tips to manage reliably build and deployment on OpenShift. If you have been experienced sudden performance degradation of build and deployment on OpenShift, it may be helpful to troubleshoot your cluster. We start to review whole processes from build to deployment, and then cover each process for more details. Basically OpenShift 4.2(Kubernetes 1.14) is based on here.
-Processes from build to deployment
+In this article, I will introduce some helpful, common tips to manage reliable builds and deployments on OpenShift. If you have experienced a sudden performance degradation for builds and deployments on OpenShift, it may be helpful to troubleshoot your cluster. We start by reviewing the whole processes from build to deployment, and then cover each aspect in more detail. We will use OpenShift 4.2 (Kubernetes 1.14) for this purpose.
 
-When CI/CD or user triggers the build for a Pod deployment, the processes will proceed like the following image that is simplified for readability.
+When a CI/CD process or a user triggers the build for a pod deployment, the processes will proceed as shown in the following image, which is simplified for readability.
 
 ![build_deploy_process](https://github.com/bysnupy/blog/blob/master/kubernetes/build_deploy_performance.png)
 
-As you can see, all parts are not controlled over by only Kubernetes, usually main processes for build and deployment depend on own configuration and external dependencies in the systems. We can split into each process by what component have responsibility to manage as follows.
+As you can see, Kubernetes does not control all of the processes, but the main processes for build and deployment depend on the user’s application build configuration and dependencies on external systems. We can split out each process by which component has responsibility to manage things as follows.
 
 Responsibility|Component
 -|-
@@ -18,9 +17,9 @@ Deploy an application|application Pod
 
 ## Kubernetes
 
-In this process, Kubernetes provides resources based on `buildConfig` and `deploymentConfig`. Usually build and deploy will be failed before starting their work, if any trouble happen in handling resources, such as volume mount failure, scheduling pending and so on. And you can also find the reasons easily in the event logs.
-So if build and deployment is successful, even though the time took more than before, it would not be Kubernetes scheduling and control problem.
-For clarifying the performance issue, we should ensure `buildConfig` and `deploymentConfig` are configured with enough resource requests through the following examples.
+In this process, Kubernetes provides resources based on the BuildConfig and DeploymentConfig. Usually, a build and deploy will fail before starting their work if there is any trouble handling resources, such as volume mount failure, scheduling pending, and so on. And you can usually find the reasons easily in the event logs.
+
+So if build and deployment is successful, even though the time took more than before, it would not be a Kubernetes scheduling and control problem. For clarifying the performance issue, we should ensure BuildConfig and DeploymentConfig are configured with enough resource requests as in the following examples.
 
 * Sample for `buildConfig`,
 ```yaml
@@ -51,8 +50,9 @@ spec:
             memory: 200Mi
 ```
 
-You should allocate resource size enough to build and deploy reliably after testing, keep in your mind it's not minimum resource setting.
-For instance, if you set "resources.requests.cpu: 32m", it'll assign more CPU time through cpu.shares control group parameter as follows.
+You should allocate resources large enough to build and deploy reliably after testing, keeping in mind that it’s not a minimum resource setting.
+
+For instance, if you set resources.requests.cpu: 32m, it will assign more CPU time through the cpu.shares control group parameter as follows.
 
 ```command
 # oc describe pod test-1-abcde | grep -E 'Node:|Container ID:|cpu:'
@@ -66,9 +66,36 @@ worker-0 ~# cat \
 /sys/fs/cgroup/cpu,cpuacct/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-podYYYYYYYY_YYYY_YYYY_YYYY_YYYYYYYYYYYY.slice/crio-XXX... Container ID ...XXX.scope/cpu.shares
 32
 ```
+As of OpenShift 4.1, you can manage a cluster wide build defaults including above resource requests through Build resource. Refer Build configuration resources for more details.
 
-Additionally, you should add `kube-reserved` and `system-reserved` to provide more reliable scheduling and minimize node resource overcommitment in all nodes.
-Refer Allocating resources for nodes in an OpenShift Container Platform cluster for more details.
+```yaml
+apiVersion: config.openshift.io/v1
+kind: Build
+metadata:
+  name: cluster
+spec:
+  buildDefaults:
+    defaultProxy:
+      httpProxy: http://proxy.com
+      httpsProxy: https://proxy.com
+      noProxy: internal.com
+    env:
+    - name: envkey
+      value: envvalue
+    resources:
+      limits:
+        cpu: 100m
+        memory: 50Mi
+      requests:
+        cpu: 10m
+        memory: 10Mi
+  buildOverrides:
+    nodeSelector:
+      selectorkey: selectorvalue
+operator: Exists
+```
+
+Additionally, you should add kube-reserved and system-reserved to provide more reliable scheduling and minimize node resource overcommitment in all nodes. Refer to Allocating resources for nodes in an OpenShift Container Platform cluster for more details.
 
 ```yaml
 apiVersion: machineconfiguration.openshift.io/v1
@@ -88,17 +115,13 @@ spec:
       memory: 512Mi
 ```
 
-If you have more than 1000 nodes, you can consider to tune percentageOfNodesToScore for scheduler performance tuning, this feature state is beta as of Kubernetes 1.14(OpenShift 4.2).
+If you have more than 1000 nodes, you can consider to tune percentageOfNodesToScore for scheduler performance tuning, this feature state is beta as of Kubernetes 1.14 (OpenShift 4.2).
 
 ##Image Registry
 
-This component work on image push and pull tasks by build and deployment.
-First of all, you should consider to adopt appropriate storage and network enough to
-process required traffic and IO for maximum concurrent image pull and push you assumed.
-Usually object storage is recommended, because it is atomic, meaning the data is either written completely or not written at all, even if there is a failure during the write.
-And it can share a volume with other duplicated registry as RWX(ReadWriteMany) mode.
-Further information is here: Recommended configurable storage technology.
-You can also consider `ImagePullPolicy` to reduce pull/push workload as follows.
+This component works on image push and pull tasks for both builds and deployments. First of all, you should consider adopting appropriate storage and network resources to process the required I/O and traffic for the maximum concurrent image pull and push you estimated. Usually object storage is recommended, because it is atomic, meaning the data is either written completely or not written at all, even if there is a failure during the write. And it can also share a volume with other duplicated registry as RWX (ReadWriteMany) mode. Further information can be found in the Recommended configurable storage technology documentation.
+
+You can also consider IfNotPresent ImagePullPolicy to reduce pull/push workload as follows.
 
 * Image pull policy
 
@@ -110,11 +133,9 @@ Never|Never pull the image
 
 ## Build Pod
 
-When build Pod is created and start to build application, all control passes to the build Pod, and work through build configurations are defined by a `BuildConfig`.
-Depending on how you choose to create your application and how to provide source content to build and operate on affect build performance.
-For instance, if you build Java or nodejs application using `maven` or `npm`, you may download many libraries from their external repositories.
-At that time the repositories or access path have some performance issue, then the build process will be failed or delayed more than usual time.
-It means if your build depend on external service or resource, it's easy to affect from that regardless of your system status. So you can consider to create local repository (maven, npm, git and so on) for reliable and stable performance for build. Or you can reuse previously downloaded dependencies, previously built artifacts as using Source-to-Image (S2I) incremental builds, if your image registry performance is enough to pull previously-built images for every incremental builds.
+When a build pod is created and starts to build an application, all control passes to the build pod, and the work is configured through build configurations parameters defined by a BuildConfig. How you choose to create your application and provide source content to build and operate on all affect build performance.
+
+For instance, if you build a Java or nodejs application using maven or npm, you may download many libraries from their respective external repositories. If at that time the repositories or access path have some performance issue, then the build process can fail or be delayed more than usual. This means that if your build depends on an external service or resource, it’s easy to suffer negative effects from that regardless of your local system’s status. So it may be best to consider creating a local repository (maven, npm, git and so on) to ensure reliable and stable performance for your builds. Or you can reuse previously downloaded dependencies and previously built artifacts by using Source-to-Image (S2I) incremental builds, if your image registry performance is enough to pull previously-built images for every incremental build.
 
 * Performing Source-to-Image (S2I) incremental builds
 
@@ -127,12 +148,11 @@ strategy:
     incremental: true
 ```
 
-And build using `Dockerfile` can optimize layered caches to decrease pull/push time.
-Let's take a look the following example, it decreased the update size as splitting into layers which is based on change frequency. To rephrase it, other unchanged layers are cached.
+And building with Dockerfile can optimize layered caches to decrease image layer pull and push time. In the following example, it decreased the update size because splitting into layers is based on change frequency. To rephrase it, any unchanged layers are cached.
 
 ![layer_cache](https://github.com/bysnupy/blog/blob/master/kubernetes/layer_cache.png)
 
-* This image has small layers but, the 35M layer is always updated when the image build is conducted.
+* This image has small layers but the 35M layer is always updated when the image build is conducted.
 
 ```command
 # podman history 31952aa275b83b9108eeffa763f7f1f531ec0830e79981755908ad6dfaa03e1b
@@ -154,7 +174,7 @@ Writing manifest to image destination
 Storing signatures
 ```
 
-* But this image has more layers then above one, the 5M layer is only updated. Other unchanged layers are cached.
+* But this image has more layers than the one above, the 5M layer is the only one that is updated. Other unchanged layers are cached.
 ```command
 # buildah bud --layers .
 STEP 1: FROM registry.redhat.io/ubi8/ubi-minimal:latest
@@ -193,13 +213,13 @@ Writing manifest to image destination
 Storing signatures
 ```
 
-You should check build logs for troubleshooting in a build process, because Kubernetes can only detect build Pod is complete successfully or not.
+You should check build logs when troubleshooting the build process, because Kubernetes can only detect whether a build pod completed successfully or not.
 
 ## Application Pod
 
-Like the Build Pod, all controls passes to the application Pod, when application Pod is created, and work through application implementation. If the application depends on external services and resources to initialize, such as DB connection pooling, KVS and other API connections.
-For instance, if DB server that is required to connection pooling have performance issues or reach the maximum connection count while application Pod is starting, 
-the application Pod initialization can delay more than you expected, so if your application have external dependencies, you also check them whether they are running well. And if `Readiness Probes` and `Liveness Probes` is configured for your application Pod, you should set `initialDelaySeconds` and `periodSeconds` enough to your application Pod initialized. If it's too short `initialDeplaySeonds` and `periodSeconds` to check the application states, your application will be restarted uselessly, it result in delay to deploy application Pod.
+Like the Build Pod, all control passes to the application pod, once application pod is created, so most of the work is through the application implementation. If the application depends on external services and resources to initialize, such as DB connection pooling, KVS, and other API connections.
+
+For instance, if DB server that uses connection pooling has performance issues or reaches the maximum connection count while the application pod is starting, the application pod initialization can be delayed more than expected. So if your application has external dependencies, you should also check to see whether they are running well. And if Readiness Probes and Liveness Probes are configured for your application pod, you should set initialDelaySeconds and periodSeconds large enough for your application pod to initialize. If it’s too short initialDelaySeconds and periodSeconds to check the application states, your application will be restarted repeatedly and may result in a delay or failure to deploy the application pod.
 
 * Monitoring container health
 
@@ -231,11 +251,8 @@ spec:
 ```
 ## Build and Deployment in parallel
 
-Lastly, I recommend to keep concurrent build and deployment tasks in one cycle as appropriate numbers for suppressing resource issues. 
-As you seen here, these tasks are chained with other tasks and it will iterate automatically through their lifecycles, so it would happen more workload than you expected. Usually compile(build) and application initialization(deployment) process is a CPU aggressive task, you may need to evaluate what count concurrent build and deployment tasks is available and stable on your cluster before scheduling their tasks.
+Lastly, I recommend to keep concurrent build and deployment tasks in one cycle as appropriate numbers for suppressing resource issues. As you can see here, these tasks are chained with other tasks and it will iterate automatically through their life cycles, so it would happen more workload than you expected. Usually the compile (build) and application initialization (deployment) processes are CPU intensive tasks. So you may need to evaluate how many concurrent build and deployment tasks are possible to ensure you have a stable cluster before scheduling new tasks.
 
 ## Conclusion
 
-We took a look how each part affect each other within build and deployment processes.
-You may already know each configuration I introduced above and it's nothing special.
-As I introduced the configuration and information set for only build and deployment performance topic for help your understanding about interaction on the build and deployment here. I hope it's helpful for your stable system management. Thank you for reading.
+We took a look at how each part affect each other within build and deployment processes. I focused on the configuration and other information related only to build and deployment performance topics in the hopes that this information will help your understanding about the interaction between the build and deployment phases of applications on OpenShift. I hope it’s helpful for your stable system management. Thank you for reading.

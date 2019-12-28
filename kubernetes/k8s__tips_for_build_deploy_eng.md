@@ -217,9 +217,9 @@ You should check build logs when troubleshooting the build process, because Kube
 
 ## Application Pod
 
-Like the Build Pod, all control passes to the application pod, once application pod is created, so most of the work is through the application implementation. If the application depends on external services and resources to initialize, such as DB connection pooling, KVS, and other API connections.
+Like the build pod, all control passes to the application pod once the application pod is created, so most of the work is done through the application implementation if the application depends on external services and resources to initialize, such as DB connection pooling, KVS, and other API connections. And you should also watch out whether `Security Software` is running on your hosts. It can usually affect all processes on the hosts, not only deployment.
 
-For instance, if DB server that uses connection pooling has performance issues or reaches the maximum connection count while the application pod is starting, the application pod initialization can be delayed more than expected. So if your application has external dependencies, you should also check to see whether they are running well. And if Readiness Probes and Liveness Probes are configured for your application pod, you should set initialDelaySeconds and periodSeconds large enough for your application pod to initialize. If it’s too short initialDelaySeconds and periodSeconds to check the application states, your application will be restarted repeatedly and may result in a delay or failure to deploy the application pod.
+For instance, if DB server that uses connection pooling has performance issues or reaches the maximum connection count while the application pod is starting, the application pod initialization can be delayed more than expected. So if your application has external dependencies, you should also check to see whether they are running well. And if Readiness Probes and Liveness Probes are configured for your application pod, you should set initialDelaySeconds and periodSeconds large enough for your application pod to initialize. If your `initialDelaySeconds` and `periodSeconds` are too short to check the application states, your application will be restarted repeatedly and may result in a delay or failure to deploy the application pod.
 
 * Monitoring container health
 

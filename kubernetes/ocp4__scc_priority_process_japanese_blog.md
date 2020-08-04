@@ -2,7 +2,7 @@
 
 Red HatでOpenShiftのサポートエンジニアをしているDaein（デイン）です。
 
-高い"Priority"をSCCに指定しても他のSCCが利用されるパターンがありますが、その時"Priority"が適用されるSCCを選定する処理でどのように動作するか説明します。
+高い"Priority"をSCCに指定しても他のSCCが利用される場合がありますが、その時"Priority"が適用されるSCCを選定する時どのように影響するか説明します。
 簡単にSecurity Context Constraints(SCC)について紹介すると、OpenShiftでPodが実行できるアクション及びアクセスを制御するリソースになります。
 通常対象Podに関連付けられているServiceAccountに必要な権限や機能が許可されたSCCを付与することでPodの動作が制御できます。詳細情報は次のドキュメントをご参照ください。
 
@@ -21,8 +21,8 @@ https://docs.openshift.com/container-platform/4.5/authentication/managing-securi
 # 動作チェック
 
 上記の動作を実際にOCP4.5の環境で確認してみましょう。
-"default" ServiceAccountに"anyuid"、"hostnetwork" 2つのSCCを追加して"hostPath"をPodに設定した前後の違いを確認してみましょう。
-"hostNetwork: true"はアサインされたSCCの中で"hostnetwork"のみ提供しているため、"anyuid"がより高い"Priority"が設定されてもPodに"hostPath"が設定された場合は"hostaccess" SCCでPodが起動されます。
+"default" ServiceAccount(SA)に"anyuid"、"hostnetwork" 2つのSCCを追加して"hostPath"をPodに設定した前後の違いを確認してみましょう。
+"hostNetwork: true"はアサインされたSCCの中で"hostnetwork"のみ提供できるため、"anyuid"がより高い"Priority"が設定されていてもPodに"hostNetwork: true"が設定された場合は"hostnetwork" SCCでPodが起動されます。
 
 デフォルトで提供しているSCCの一覧は次の通りになります。cluster-admin権限を持つアカウントは次のSCCが全てご利用できます。
 ```cmd
@@ -45,7 +45,7 @@ $ oc adm policy add-scc-to-user anyuid     -z default
 clusterrole.rbac.authorization.k8s.io/system:openshift:scc:anyuid added: "default"
 
 $ oc adm policy add-scc-to-user hostnetwork -z default
-clusterrole.rbac.authorization.k8s.io/system:openshift:scc:hostaccess added: "default"
+clusterrole.rbac.authorization.k8s.io/system:openshift:scc:hostnetwork added: "default"
 ```
 
 一般ユーザーとして認証して"hostNetwork: true"を設定しないPodと設定したPodを作成して起動させます。

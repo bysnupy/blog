@@ -17,7 +17,9 @@ https://docs.openshift.com/container-platform/4.5/authentication/managing-securi
 1. 操作するユーザーまたはPodで参照されるServiceAccount(SA)で許可されたSCCを洗い出します。
 2. 洗い出されたSCCをPriorityの高い順にソートします。
 3. ソートされたSCC順でPodの設定に適用できるSCCがあるかチェックします。
-4. 最初にマッチした1つのSCCでPodを作成しす。この処理順序は、"Priority"設定が影響します。
+4. 最初にマッチした1つのSCCでPodを作成します。この処理順序は、"Priority"設定が影響します。（"Priority"が指定あれていない場合は"0"としてみなされます。）
+   4.1. 同じ"Priority"の場合はより制約されたSCCが優先されます。
+   4.2. "Priority"と"制約"も同じの場合はSCC名のソート順で優先されます。
 5. マッチするSCCがなかった場合はPodは無効になって作成されません。
 
 ![scc_process_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/scc-process.png)
@@ -25,31 +27,20 @@ https://docs.openshift.com/container-platform/4.5/authentication/managing-securi
 # 動作確認
 
 上記の動作を実際にOCP4.5の環境で次の通り確認してみましょう。
+
+## "Priority"よりPodの設定が優先されるパターン
+
 "default" ServiceAccount(SA)に"anyuid"、"hostnetwork" 2つのSCCをアサインして"hostNetwork: true"をPodに設定した前後の違いを確認してみましょう。
 "hostNetwork: true"はアサインされたSCCの中で"hostnetwork"のみ提供できるため、"anyuid"がより高い"Priority"が設定されていてもPodに"hostNetwork: true"がリクエストされた場合は"hostnetwork" SCCでPodが作成されます。
-また、"cluster-admin"のクラスタロールを持つ認証ユーザーであればSCCを別途設定しなくてもどのSCCでも利用できるため、"Forbidden"エラーなしで適切なSCCが設定されてPodが作成されることも確認します。
 
-デフォルトで提供しているSCCの一覧は次の通りになります。cluster-admin権限を持つアカウントは次のSCCが利用できます。
-```cmd
-$ oc get scc
-NAME               PRIV    CAPS         SELINUX     RUNASUSER          FSGROUP     SUPGROUP    PRIORITY     READONLYROOTFS   VOLUMES
-anyuid             false   <no value>   MustRunAs   RunAsAny           RunAsAny    RunAsAny    10           false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
-hostaccess         false   <no value>   MustRunAs   MustRunAsRange     MustRunAs   RunAsAny    <no value>   false            [configMap downwardAPI emptyDir hostPath persistentVolumeClaim projected secret]
-hostmount-anyuid   false   <no value>   MustRunAs   RunAsAny           RunAsAny    RunAsAny    <no value>   false            [configMap downwardAPI emptyDir hostPath nfs persistentVolumeClaim projected secret]
-hostnetwork        false   <no value>   MustRunAs   MustRunAsRange     MustRunAs   MustRunAs   <no value>   false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
-node-exporter      true    <no value>   RunAsAny    RunAsAny           RunAsAny    RunAsAny    <no value>   false            [*]
-nonroot            false   <no value>   MustRunAs   MustRunAsNonRoot   RunAsAny    RunAsAny    <no value>   false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
-privileged         true    [*]          RunAsAny    RunAsAny           RunAsAny    RunAsAny    <no value>   false            [*]
-restricted         false   <no value>   MustRunAs   MustRunAsRange     MustRunAs   RunAsAny    <no value>   false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
-```
 
 テストのため、プロジェクトを作成し、その配下のdefault SAにanyuidとhostnetworkのアサインします。
 ```cmd
 $ oc new-project test-scc
-$ oc adm policy add-scc-to-user anyuid     -z default
+$ oc adm policy add-scc-to-user anyuid     -z default -n test-scc
 clusterrole.rbac.authorization.k8s.io/system:openshift:scc:anyuid added: "default"
 
-$ oc adm policy add-scc-to-user hostnetwork -z default
+$ oc adm policy add-scc-to-user hostnetwork -z default -n test-scc
 clusterrole.rbac.authorization.k8s.io/system:openshift:scc:hostnetwork added: "default"
 ```
 
@@ -111,7 +102,97 @@ Podに設定された機能や権限が提供可能なものがアサインさ�
 Error from server (Forbidden): error when creating "STDIN": pods "test-hostnetwork" is forbidden: unable to validate against any security context constraint: [provider anyuid: .spec.securityContext.hostNetwork: Invalid value: true: Host network is not allowed to be used spec.containers[0].securityContext.hostNetwork: Invalid value: true: Host network is not allowed to be used provider restricted: .spec.securityContext.hostNetwork: Invalid value: true: Host network is not allowed to be used spec.containers[0].securityContext.hostNetwork: Invalid value: true: Host network is not allowed to be used]
 ```
 
-比較として、"cluster-admin"のクラスタロールを持つ認証ユーザーであれば、別途アサイン作業なしでただPodを作成するだけでSCCが設定されますので、一般ユーザーに設定をテストする場合は注意してください。
+## 同じ"Priority"の場合はより強い制約のSCCが適用されるパターン
+
+"default" ServiceAccount(SA)に"root"が指定できない制限をしたまま、DockerfileのUSERに指定された特定のUIDでPodを作成する意図として"nonroot" SCCをアサインしているにも関わらず、デフォルトSCCの"restricted"が同じ"Priority"でかつより強い制約を持っているため優先して起用されます。"nonroot" SCCを適用するためには明示的に"securityContext.runAsUser: XXX"で特定のUIDを指定頂く必要があります。
+
+テストのため、プロジェクトを作成し、その配下のdefault SAにnonrootのみアサインします。
+```cmd
+$ oc new-project test-scc2
+$ oc adm policy add-scc-to-user nonroot     -z default -n test-scc2
+clusterrole.rbac.authorization.k8s.io/system:openshift:scc:nonroot added: "default"
+```
+
+一般ユーザーとして認証して"runAsUser: 6868"を設定しないPodと設定したPodを作成します。
+```
+$ oc login -u normal-user -p YOURPASSWORD
+$ oc whoami
+normal-user
+
+$ oc create -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-nonroot
+spec:
+  containers:
+  - args:
+    - tail
+    - -f
+    - /dev/null
+    image: registry.redhat.io/ubi8/ubi
+    name: test
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-nonroot-runasuser
+spec:
+  hostNetwork: true
+  containers:
+  - args:
+    - tail
+    - -f
+    - /dev/null
+    image: registry.redhat.io/ubi8/ubi
+    name: test
+    securityContext:
+      runAsUser: 6868
+EOF
+```
+
+次の通り、同じ"Priority"のSCCであってもPodの設定として明示的に"runAsUser: 6868"が指定されなかった場合はより制約が強い"restricted" SCCが適用されることが確認できます。
+```
+$ oc get pod
+NAME                     READY   STATUS    RESTARTS   AGE
+test-nonroot             1/1     Running   0          16m
+test-nonroot-runasuser   1/1     Running   0          13m
+
+$ oc rsh test-nonroot id
+uid=1000600000(1000600000) gid=0(root) groups=0(root),1000600000
+
+$ oc rsh test-nonroot-runasuser id
+uid=6868(6868) gid=0(root) groups=0(root)
+
+$ oc get pod -o yaml | grep -E '^    name:|openshift.io/scc:|serviceAccountName:'
+      openshift.io/scc: restricted
+    name: test-nonroot
+    serviceAccountName: default
+		
+      openshift.io/scc: nonroot
+    name: test-nonroot-runasuser
+    serviceAccountName: default
+```
+
+## "cluster-admin"のクラスタロールで操作した場合、別途SCCのアサインなしで関連機能が利用できるパターン
+
+"cluster-admin"のクラスタロールを持つ認証ユーザーであればSCCを別途設定しなくてもどのSCCでも利用できるため、"Forbidden"エラーなしで適切なSCCが設定されてPodが作成されることを確認します。
+
+デフォルトで提供しているSCCの一覧は次の通りになります。cluster-admin権限を持つアカウントは次のSCCが利用できます。
+```cmd
+$ oc get scc
+NAME               PRIV    CAPS         SELINUX     RUNASUSER          FSGROUP     SUPGROUP    PRIORITY     READONLYROOTFS   VOLUMES
+anyuid             false   <no value>   MustRunAs   RunAsAny           RunAsAny    RunAsAny    10           false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
+hostaccess         false   <no value>   MustRunAs   MustRunAsRange     MustRunAs   RunAsAny    <no value>   false            [configMap downwardAPI emptyDir hostPath persistentVolumeClaim projected secret]
+hostmount-anyuid   false   <no value>   MustRunAs   RunAsAny           RunAsAny    RunAsAny    <no value>   false            [configMap downwardAPI emptyDir hostPath nfs persistentVolumeClaim projected secret]
+hostnetwork        false   <no value>   MustRunAs   MustRunAsRange     MustRunAs   MustRunAs   <no value>   false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
+node-exporter      true    <no value>   RunAsAny    RunAsAny           RunAsAny    RunAsAny    <no value>   false            [*]
+nonroot            false   <no value>   MustRunAs   MustRunAsNonRoot   RunAsAny    RunAsAny    <no value>   false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
+privileged         true    [*]          RunAsAny    RunAsAny           RunAsAny    RunAsAny    <no value>   false            [*]
+restricted         false   <no value>   MustRunAs   MustRunAsRange     MustRunAs   RunAsAny    <no value>   false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
+```
+
+一般ユーザーと比較して、"cluster-admin"のクラスタロールを持つ認証ユーザーであれば、別途アサイン作業なしでただPodを作成するだけでSCCが設定されますので、一般ユーザーに設定をテストする場合は注意してください。
 ```cmd
 $ oc new-project test-scc-adminuser
 $ oc login -u admin-user -p YOURPASSWORD

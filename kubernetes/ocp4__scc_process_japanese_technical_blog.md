@@ -2,7 +2,7 @@
 
 Red HatでOpenShiftのサポートエンジニアをしているDaein（デイン）です。
 
-Security Context Constraints(SCC)を正しく設定するためにどのようなプロセスで適用されるか説明します。
+Security Context Constraints(SCC)を正しく設定するためにどのようなプロセスで適用されていか確認していきます。
 簡単にSecurity Context Constraints(SCC)について紹介すると、OpenShiftでPodが実行できるアクション及びアクセスを制御するリソースになります。
 通常対象Podを作成する認証ユーザーやリンクされているServiceAccountに許可されたSCCを利用してPodを起動させて制御できます。詳細情報は次のドキュメントをご参照ください。
 

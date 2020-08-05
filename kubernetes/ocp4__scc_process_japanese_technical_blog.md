@@ -14,19 +14,19 @@ https://docs.openshift.com/container-platform/4.5/authentication/managing-securi
 また、SCCを複数付与してもその機能や権限が合わせて適用されるわけではないのでビルトインのSCCで対応できない場合は別途カスタムSCCを作成する必要があります。
 処理フローをシンプルに説明すると次の通りになります。
 
-1. 操作する認証ユーザー又はPodを起動させるServiceAccount(SA)に許可されたSCCを洗い出します。
-1. そのSCCを高いPriority順にソートします。
-2. ソートされたSCC順にPodの設定を満たしているかチェックします。
-3. 最初マッチされたSCCがあったらその1つSCCでPodは起動されます。この処理順序は"Priority"設定に影響を受けます。
-4. マッチされたSCCがなかった場合はPodは無効になって起動されません。
+1. 操作する認証ユーザー又はPodで参照されるServiceAccount(SA)に許可されたSCCを洗い出します。
+1. そのSCCは高いPriority順にソートされます。
+2. ソートされたSCC順にPodの設定が提供できるSCCがあるかチェックします。
+3. 最初マッチされたSCCが現れたらその1つSCCでPodは作成されます。この処理順序は"Priority"設定に影響を受けます。
+4. マッチされたSCCがなかった場合はPodは無効になって作成されません。
 
 ![scc_process_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/scc-process.png)
 
 # 動作確認
 
-上記の動作を実際にOCP4.5の環境で次の確認してみましょう。
-"default" ServiceAccount(SA)に"anyuid"、"hostnetwork" 2つのSCCを追加して"hostPath"をPodに設定した前後の違いを確認してみましょう。
-"hostNetwork: true"はアサインされたSCCの中で"hostnetwork"のみ提供できるため、"anyuid"がより高い"Priority"が設定されていてもPodに"hostNetwork: true"がリクエストされた場合は"hostnetwork" SCCでPodが起動されます。
+上記の動作を実際にOCP4.5の環境で次の通り確認してみましょう。
+"default" ServiceAccount(SA)に"anyuid"、"hostnetwork" 2つのSCCをアサインして"hostNetwork: true"をPodに設定した前後の違いを確認してみましょう。
+"hostNetwork: true"はアサインされたSCCの中で"hostnetwork"のみ提供できるため、"anyuid"がより高い"Priority"が設定されていてもPodに"hostNetwork: true"がリクエストされた場合は"hostnetwork" SCCでPodが作成されます。
 また、"cluster-admin"のクラスタロールを持つ認証ユーザーであればSCCを別途設定しなくてもどのSCCでも利用できるため、"Forbidden"エラーなしで適切なSCCが設定されてPodが作成されることも確認します。
 
 デフォルトで提供しているSCCの一覧は次の通りになります。cluster-admin権限を持つアカウントは次のSCCが全てご利用できます。
@@ -43,7 +43,7 @@ privileged         true    [*]          RunAsAny    RunAsAny           RunAsAny 
 restricted         false   <no value>   MustRunAs   MustRunAsRange     MustRunAs   RunAsAny    <no value>   false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
 ```
 
-テストのため、プロジェクトを作成し、その配下のdefault SAにanyuidとhostnetworkの追加しておきます。
+テストのため、プロジェクトを作成し、その配下のdefault SAにanyuidとhostnetworkのアサインします。
 ```cmd
 $ oc new-project test-scc
 $ oc adm policy add-scc-to-user anyuid     -z default
@@ -53,7 +53,7 @@ $ oc adm policy add-scc-to-user hostnetwork -z default
 clusterrole.rbac.authorization.k8s.io/system:openshift:scc:hostnetwork added: "default"
 ```
 
-一般ユーザーとして認証して"hostNetwork: true"を設定しないPodと設定したPodを作成して起動させます。
+一般ユーザーとして認証して"hostNetwork: true"を設定しないPodと設定したPodを作成します。
 ```cmd
 $ oc login -u normal-user -p YOURPASSWORD
 $ oc whoami
@@ -106,12 +106,12 @@ $ oc get pod -o yaml | grep -E '^    name:|openshift.io/scc:|serviceAccountName:
     serviceAccountName: default
 ```
 
-Podに設定された機能が利用可能なSCCの中でマッチされなかった場合は次のForbiddenエラーメッセージが表示され、Podが作成できなくなります。
+Podに設定された機能や権限が提供可能なものがアサインされたSCCの中でマッチされなかった場合は次の通りForbiddenエラーメッセージが表示され、Podが作成できなくなります。
 ```cmd
 Error from server (Forbidden): error when creating "STDIN": pods "test-hostnetwork" is forbidden: unable to validate against any security context constraint: [provider anyuid: .spec.securityContext.hostNetwork: Invalid value: true: Host network is not allowed to be used spec.containers[0].securityContext.hostNetwork: Invalid value: true: Host network is not allowed to be used provider restricted: .spec.securityContext.hostNetwork: Invalid value: true: Host network is not allowed to be used spec.containers[0].securityContext.hostNetwork: Invalid value: true: Host network is not allowed to be used]
 ```
 
-比較として、"cluster-admin"のクラスタロールを持つ認証ユーザーであればただPodを作成するだけでSCCが適切に設定されますので、テスト時には注意が必要です。
+比較として、"cluster-admin"のクラスタロールを持つ認証ユーザーであれば、別途アサイン作業なしでただPodを作成するだけでSCCが設定されますので、一般ユーザーに設定をテストする場合は注意してください。
 ```cmd
 $ oc new-project test-scc-adminuser
 $ oc login -u admin-user -p YOURPASSWORD
@@ -161,7 +161,7 @@ $ oc get pod -o yaml | grep -E '^    name:|openshift.io/scc:|serviceAccountName:
 
 # 実装からの確認
 
-主に"computeSecurityContext"関数からSCCの適用プロセスが実施されていますので興味ある方はご参考ください。ソースコード全文はこちらをご参照ください。
+主に"computeSecurityContext"関数からSCCの適用プロセスが実施されますので興味ある方はご参考ください。ソースコード全文はこちらをご参照できます。
 https://github.com/openshift/apiserver-library-go/blob/a7bc13e3e6504ddc7056ab9a5d2d6c61f7eb45b9/pkg/securitycontextconstraints/sccadmission/admission.go#L133-L237
 
 ```golang
@@ -200,5 +200,5 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
 
 https://github.com/openshift/origin/blob/bce0020d05343434cb9f6453ea62ca78ee82f064/docs/proposals/security-context-constraints.md#admission
 
-通常専用のSAを作成し、必要最低限のSCCを利用してPodを運用するべきですが、11つのSAで仕様が違う複数のPodを運用したりする場合は参考にしてください。
+通常専用のSAを作成し、必要最低限のSCCを利用してPodを運用するべきですが、1つのSAで仕様が違う複数のPodを運用したりする場合は参考にしてください。
 

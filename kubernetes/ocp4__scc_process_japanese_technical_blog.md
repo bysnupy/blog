@@ -168,7 +168,7 @@ https://github.com/openshift/apiserver-library-go/blob/a7bc13e3e6504ddc7056ab9a5
 func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Attributes, pod *coreapi.Pod, specMutationAllowed bool, validatedSCCHint string) (*coreapi.Pod, string, field.ErrorList, error) {
 	// get all constraints that are usable by the user
   :
-  // "FindApplicableSCCs"関すから許可されたSCCを"Priority"順にソートした一覧が返却されます。
+  // "FindApplicableSCCs"関数から許可されたSCCを"Priority"順にソートした一覧が返却されます。
   constraints, err := sccmatching.NewDefaultSCCMatcher(c.sccLister, nil).FindApplicableSCCs(ctx, a.GetNamespace())
   :
   // こちらからPod設定にマッチするSCCを確認するループが実装されています。

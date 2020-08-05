@@ -18,8 +18,8 @@ https://docs.openshift.com/container-platform/4.5/authentication/managing-securi
 2. 洗い出されたSCCをPriorityの高い順にソートします。
 3. ソートされたSCC順でPodの設定に適用できるSCCがあるかチェックします。
 4. 最初にマッチした1つのSCCでPodを作成します。この処理順序は、"Priority"設定が影響します。（"Priority"が指定あれていない場合は"0"としてみなされます。）
-   4.1. 同じ"Priority"の場合はより制約されたSCCが優先されます。
-   4.2. "Priority"と"制約"も同じの場合はSCC名のソート順で優先されます。
+   - 同じ"Priority"の場合はより制約されたSCCが優先されます。
+   - "Priority"と"制約"も同じの場合はSCC名のソート順で優先されます。
 5. マッチするSCCがなかった場合はPodは無効になって作成されません。
 
 ![scc_process_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/scc-process.png)

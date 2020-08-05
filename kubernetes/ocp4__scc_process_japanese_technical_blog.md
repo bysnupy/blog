@@ -104,7 +104,7 @@ Error from server (Forbidden): error when creating "STDIN": pods "test-hostnetwo
 
 ## 同じ"Priority"の場合はより強い制約のSCCが適用されるパターン
 
-"default" ServiceAccount(SA)に"root"が指定できない制限をしたまま、DockerfileのUSERに指定された特定のUIDでPodを作成する意図として"nonroot" SCCをアサインしているにも関わらず、デフォルトSCCの"restricted"が同じ"Priority"でかつより強い制約を持っているため優先して起用されます。"nonroot" SCCを適用するためには明示的に"securityContext.runAsUser: XXX"で特定のUIDを指定頂く必要があります。
+"default" ServiceAccount(SA)に"root"が指定できない制限をしたまま、DockerfileのUSERに指定された特定のUIDでPodを作成する意図として"nonroot" SCCをアサインしているにも関わらず、デフォルトSCCの"restricted"が同じ"Priority"でかつより強い制約を持っているため優先して起用されます。"nonroot" SCCを適用するためには明示的に"securityContext.runAsUser: XXX"で特定のUIDをPod設定に指定するか、"nonroot" SCCの"Priority"を"restricted"より高く設定する必要があります。Pod設定での適用は上記のパターンで確認しましたので今回は"Priority"を修正するパターンで確認します。
 
 テストのため、プロジェクトを作成し、その配下のdefault SAにnonrootのみアサインします。
 ```cmd
@@ -113,8 +113,8 @@ $ oc adm policy add-scc-to-user nonroot     -z default -n test-scc2
 clusterrole.rbac.authorization.k8s.io/system:openshift:scc:nonroot added: "default"
 ```
 
-一般ユーザーとして認証して"runAsUser: 6868"を設定しないPodと設定したPodを作成します。
-```
+一般ユーザーとして認証してPodを作成します。
+```cmd
 $ oc login -u normal-user -p YOURPASSWORD
 $ oc whoami
 normal-user
@@ -130,48 +130,73 @@ spec:
     - tail
     - -f
     - /dev/null
-    image: registry.redhat.io/ubi8/ubi
+    image: registry.redhat.io/rhel8/nginx-116
     name: test
----
+```
+
+次の通り、同じ"Priority"のSCCであってもより制約が強い"restricted" SCCが適用されることが確認できます。
+
+```cmd
+$ oc get pod
+NAME                     READY   STATUS    RESTARTS   AGE
+test-nonroot             1/1     Running   0          16m
+
+$ oc rsh test-nonroot id
+uid=1000600000(1000600000) gid=0(root) groups=0(root),1000600000
+
+$ oc get pod test-nonroot -o yaml | grep -E 'openshift.io/scc:|serviceAccountName:'
+    openshift.io/scc: restricted
+  serviceAccountName: default
+```
+
+続いて"cluster-admin"のクラスタロールを持つアカウントで"nonroot" SCCの"Priority"を"20"に修正してから一般ユーザーとして認証してPodを作成します。
+```
+$ oc login -u admin-user -p YOURPASSWORD
+$ oc whoami
+admin-user
+$ oc edit scc nonroot
+:
+priority: 20
+:
+
+$ oc get scc restricted nonroot
+NAME         PRIV    CAPS         SELINUX     RUNASUSER          FSGROUP     SUPGROUP   PRIORITY     READONLYROOTFS   VOLUMES
+restricted   false   <no value>   MustRunAs   MustRunAsRange     MustRunAs   RunAsAny   <no value>   false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
+nonroot      false   <no value>   MustRunAs   MustRunAsNonRoot   RunAsAny    RunAsAny   20           false            [configMap downwardAPI emptyDir persistentVolumeClaim projected secret]
+
+$ oc login -u normal-user -p YOURPASSWORD
+$ oc whoami
+normal-user
+
+$ oc create -f - <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
-  name: test-nonroot-runasuser
+  name: test-nonroot-after-prio
 spec:
-  hostNetwork: true
   containers:
   - args:
     - tail
     - -f
     - /dev/null
-    image: registry.redhat.io/ubi8/ubi
+    image: registry.redhat.io/rhel8/nginx-116
     name: test
-    securityContext:
-      runAsUser: 6868
 EOF
 ```
 
-次の通り、同じ"Priority"のSCCであってもPodの設定として明示的に"runAsUser: 6868"が指定されなかった場合はより制約が強い"restricted" SCCが適用されることが確認できます。
-```
+次の通り、より高い"Priority"が設定された"nonroot" SCCが適用され、DockerfileのUSERに指定されたUIDが暗黙的に反映されていることが確認できます。
+```cmd
 $ oc get pod
-NAME                     READY   STATUS    RESTARTS   AGE
-test-nonroot             1/1     Running   0          16m
-test-nonroot-runasuser   1/1     Running   0          13m
+NAME                      READY   STATUS    RESTARTS   AGE
+test-nonroot              1/1     Running   0          89m
+test-nonroot-after-prio   1/1     Running   0          62s
 
-$ oc rsh test-nonroot id
-uid=1000600000(1000600000) gid=0(root) groups=0(root),1000600000
+$ oc rsh test-nonroot-after-prio id
+uid=1001(default) gid=0(root) groups=0(root)
 
-$ oc rsh test-nonroot-runasuser id
-uid=6868(6868) gid=0(root) groups=0(root)
-
-$ oc get pod -o yaml | grep -E '^    name:|openshift.io/scc:|serviceAccountName:'
-      openshift.io/scc: restricted
-    name: test-nonroot
-    serviceAccountName: default
-		
-      openshift.io/scc: nonroot
-    name: test-nonroot-runasuser
-    serviceAccountName: default
+$ oc get pod test-nonroot-after-prio -o yaml | grep -E 'openshift.io/scc:|serviceAccountName:'
+    openshift.io/scc: nonroot
+  serviceAccountName: default
 ```
 
 ## "cluster-admin"のクラスタロールで操作した場合、別途SCCのアサインなしで関連機能が利用できるパターン

@@ -3,22 +3,22 @@
 Red HatでOpenShiftのサポートエンジニアをしているDaein（デイン）です。
 
 Security Context Constraints(SCC)を正しく設定するためにどのようなプロセスで適用されていか確認していきます。
-簡単にSecurity Context Constraints(SCC)について紹介すると、OpenShiftでPodが実行できるアクション及びアクセスを制御するリソースになります。
-通常対象Podを作成する認証ユーザーやリンクされているServiceAccountに許可されたSCCを利用してPodを起動させて制御できます。詳細情報は次のドキュメントをご参照ください。
+
+Security Context Constraints(SCC)は、OpenShiftでPodが実行できるアクション及びアクセスを制御するリソースです。Podを作成するユーザーやリンクされているServiceAccountで許可されたSCCの制限を利用し、Podを起動させます。詳細情報は次のドキュメントをご参照ください。
 
 https://docs.openshift.com/container-platform/4.5/authentication/managing-security-context-constraints.html#admission_configuring-internal-oauth
 
 # 処理の流れ
 
-"Priority"の項目を一番高く指定したSCCのみ適用されると考えしやすいですが、実際には対象Podの設定によって左右されます。
+まず、"Priority"の項目を一番高く指定したSCCのみ適用されると考えてしまいがちですが、実際には対象Podの設定によっても左右されます。
 また、SCCを複数付与してもその機能や権限が合わせて適用されるわけではないのでビルトインのSCCで対応できない場合は別途カスタムSCCを作成する必要があります。
-処理フローをシンプルに説明すると次の通りになります。
+処理の流れを簡単に説明すると、次のようになります。
 
-1. 操作する認証ユーザー又はPodで参照されるServiceAccount(SA)に許可されたSCCを洗い出します。
-1. そのSCCは高いPriority順にソートされます。
-2. ソートされたSCC順にPodの設定が提供できるSCCがあるかチェックします。
-3. 最初マッチされたSCCが現れたらその1つSCCでPodは作成されます。この処理順序は"Priority"設定に影響を受けます。
-4. マッチされたSCCがなかった場合はPodは無効になって作成されません。
+1. 操作するユーザーまたはPodで参照されるServiceAccount(SA)で許可されたSCCを洗い出します。
+2. 洗い出されたSCCをPriorityの高い順にソートします。
+3. ソートされたSCC順でPodの設定に適用できるSCCがあるかチェックします。
+4. 最初にマッチした1つのSCCでPodを作成しす。この処理順序は、"Priority"設定が影響します。
+5. マッチするSCCがなかった場合はPodは無効になって作成されません。
 
 ![scc_process_flow](https://github.com/bysnupy/blog/blob/master/kubernetes/scc-process.png)
 
@@ -29,7 +29,7 @@ https://docs.openshift.com/container-platform/4.5/authentication/managing-securi
 "hostNetwork: true"はアサインされたSCCの中で"hostnetwork"のみ提供できるため、"anyuid"がより高い"Priority"が設定されていてもPodに"hostNetwork: true"がリクエストされた場合は"hostnetwork" SCCでPodが作成されます。
 また、"cluster-admin"のクラスタロールを持つ認証ユーザーであればSCCを別途設定しなくてもどのSCCでも利用できるため、"Forbidden"エラーなしで適切なSCCが設定されてPodが作成されることも確認します。
 
-デフォルトで提供しているSCCの一覧は次の通りになります。cluster-admin権限を持つアカウントは次のSCCが全てご利用できます。
+デフォルトで提供しているSCCの一覧は次の通りになります。cluster-admin権限を持つアカウントは次のSCCが利用できます。
 ```cmd
 $ oc get scc
 NAME               PRIV    CAPS         SELINUX     RUNASUSER          FSGROUP     SUPGROUP    PRIORITY     READONLYROOTFS   VOLUMES
@@ -159,9 +159,10 @@ $ oc get pod -o yaml | grep -E '^    name:|openshift.io/scc:|serviceAccountName:
     serviceAccountName: default
 ```
 
-# 実装からの確認
+# 実装の確認
 
-主に"computeSecurityContext"関数からSCCの適用プロセスが実施されますので興味ある方はご参考ください。ソースコード全文はこちらをご参照できます。
+以下は、興味ある方はご参考ください。
+主に"computeSecurityContext"関数からSCCの適用プロセスが実施されます。ソースコード全文はこちらで参照できます。
 https://github.com/openshift/apiserver-library-go/blob/a7bc13e3e6504ddc7056ab9a5d2d6c61f7eb45b9/pkg/securitycontextconstraints/sccadmission/admission.go#L133-L237
 
 ```golang
@@ -171,7 +172,7 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
   // "FindApplicableSCCs"関数から許可されたSCCを"Priority"順にソートした一覧が返却されます。
   constraints, err := sccmatching.NewDefaultSCCMatcher(c.sccLister, nil).FindApplicableSCCs(ctx, a.GetNamespace())
   :
-  // こちらからPod設定にマッチするSCCを確認するループが実装されています。
+  // ここからPod設定にマッチするSCCを確認するループが実装されています。
   loop:
   	for _, provider := range providers {
   		// Get the SCC attributes required to decide whether the SCC applies for current user/SA
@@ -196,9 +197,8 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
 
 # まとめ
 
-以上、簡単にSCCがどのように処理されて適用されるか紹介しました。SCCの設計関連の資料も補足としてご参考頂ければと思います。
+簡単にSCCがどのように処理されて適用されるか紹介しました。SCCの設計関連の資料も補足としてご参考にしてください。
 
 https://github.com/openshift/origin/blob/bce0020d05343434cb9f6453ea62ca78ee82f064/docs/proposals/security-context-constraints.md#admission
 
-通常専用のSAを作成し、必要最低限のSCCを利用してPodを運用するべきですが、1つのSAで仕様が違う複数のPodを運用したりする場合は参考にしてください。
-
+通常は、専用のSAを作成し、必要最低限のSCCを利用してPodを運用するべきですが、1つのSAで仕様が違う複数のPodを運用する場合には注意が必要です。

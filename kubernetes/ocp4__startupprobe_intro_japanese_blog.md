@@ -17,7 +17,7 @@ https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-read
 
 ## startupProbeが追加された背景
 
-起動まである程度時間が必要なコンテナの場合はlivenessProbeのinitialDelaySeconds（コンテナ起動後、最初Probeが実施されるまでの秒数を指定）で初期化が成功していたか確認して失敗した場合はコンテナを再起動して改めてコンテナの初期化を実施できるように構成する必要がありました。ただし、livenessProbeはコンテナの起動時だけではなく全ライフサイクルをカバーする必要があるため、アプリケーションの起動時間がより長くなったり、大きく変動したりするとそれにフォーカスした設定が難しくなってしまいがちですが、その時startupProbeを利用して他のProbesと切り分けて設定できます。
+起動まである程度時間が必要なコンテナの場合はlivenessProbeのinitialDelaySeconds（コンテナ起動後、最初Probeが実施されるまでの秒数を指定する項目）で初期化が成功していたか確認して失敗した場合はコンテナを再起動して改めてコンテナの初期化を実施できるように構成する必要がありました。ただし、livenessProbeはコンテナの起動時だけではなく全ライフサイクルをカバーする必要があるため、アプリケーションの起動時間がより長くなったり、大きく変動したりするとそれにフォーカスした設定が難しくなってしまいがちですが、その時startupProbeを利用して他のProbesと切り分けて設定できます。
 
 UpstreamでstartupProbe機能の設計関連文書は次のところをご参照ください。
 https://github.com/kubernetes/enhancements/blob/c872c41603f9822f6947256610feb2aae12b2253/keps/sig-node/20190221-livenessprobe-holdoff.md#summary
@@ -73,7 +73,7 @@ spec:
       memory: 512Mi
 ```
 
-次の通り、startupProbe,livenessProbe,readinessProbeを全て定義して、startupProbeが成功だと判定されるまで他のProbesが実際に開始されないか確認してみましょう。
+次の通り、テスト用のPodに大してstartupProbe、livenessProbe、readinessProbeを全て定義して、startupProbeが成功だと判定されるまで他のProbesが実際に開始されないか確認してみましょう。
 ```yaml
       startupProbe:
         httpGet:
@@ -95,7 +95,7 @@ spec:
         periodSeconds: 3
 ```
 
-まず、startupProbeが成功するまで次の通り、livenessProbe及びreadinessProbeが一切開始されないことが分かります。
+先にstartupProbeが成功するまで次の通り、livenessProbe及びreadinessProbeが一切開始されないことが確認できます。
 ```console
 Start time :  Tuesday September, 22 2020 08:27:43
 10.129.2.1 - - [22/Sep/2020 08:27:44] "GET /startup_healthz HTTP/1.1" 500 -
@@ -105,7 +105,7 @@ Start time :  Tuesday September, 22 2020 08:27:43
 10.129.2.1 - - [22/Sep/2020 08:28:22] "GET /startup_healthz HTTP/1.1" 500 -  <--- 20回目でstartupProbeが失敗され、コンテナが再起動されるまで他のProbesは一切実施されません。
 ```
 
-startupProbeが失敗された場合はコンテナが再起動されて次の通りイベントログが出力されますのでご参考ください。
+startupProbeが失敗された場合はコンテナが再起動されて次のようなイベントログが出力されますのでご参考ください。
 ```console
 Events:
   Type     Reason          Age                     From                                Message
@@ -114,7 +114,7 @@ Events:
   Normal   Killing         3m52s                   kubelet, worker1.ocp45.example.com  Container testtools failed startup probe, will be restarted
 ```
 
-startupProbeが失敗される前にアプリケーションから200を返すように設定を変更すると次回のチェックでstartupProbeが成功だと判定し、その後の運用向けの間隔と監視URLを用いて設定した他のProbesが開始されることが確認できます。
+startupProbeが失敗される前にアプリケーションから200（成功だと判定されるステータスコード）を返すように設定を変更すると次回のチェックでstartupProbeが成功だと判定され、その後の運用向けの間隔と監視URLを用いて設定した他のProbesが開始されることが確認できます。
 ```
 Start time :  Tuesday September, 22 2020 08:36:03
 10.129.2.1 - - [22/Sep/2020 08:36:05] "GET /startup_healthz HTTP/1.1" 500 -

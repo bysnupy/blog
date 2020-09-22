@@ -23,7 +23,7 @@ UpstreamでstartupProbe機能の設計関連文書は次のところをご参照
 https://github.com/kubernetes/enhancements/blob/c872c41603f9822f6947256610feb2aae12b2253/keps/sig-node/20190221-livenessprobe-holdoff.md#summary
 
 ## startupProbeの設定と処理フロー
-startupProbeは既存livenessProbeと全く同じ方法で設定できるため、特別な設定などが追加されたわけではありませんが、startupProbeが設定された場合は、コンテナ起動後、他のprobesより先に評価されて成功と判定されない限り、コンテナが再起動されて次のProbesが開始されないところが既存処理フローと違うと思います。
+startupProbeは既存livenessProbeと全く同じ方法で設定できるため、特別な設定などが追加されたわけではありませんが、startupProbeが設定された場合は、コンテナ起動後、他のprobesより先に評価されて成功と判定されない限り、コンテナが再起動されて次のProbesが開始されないところが既存処理フローと違います。
 
 ちなみに、readinessProbeと違ってstartupProbeとlivenessProbeはsuccessThresholdを"1"しか指定できないのでご注意ください。
 https://github.com/openshift/origin/blob/47c0e715581cfb08dd54dd53e37c49b9182f0298/vendor/k8s.io/kubernetes/pkg/apis/core/validation/validation.go#L2739-L2747

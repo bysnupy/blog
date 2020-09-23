@@ -7,25 +7,25 @@ https://github.com/kubernetes/kubernetes/blob/f99ed92ed149e8cbb09dfcdcff78e6fb40
 
 ## Probesとは
 
-今まではlivenessProbeとreadinessProbeを利用して安定的なサービスが提供できるようにコンテナの起動状態を定期的にチェックして正しく起動できなくなったコンテナを再起動させたり、外部からのアクセスを遮断させたりする機能を提供していました。
+これまでlivenessProbeとreadinessProbeは、安定的なサービスが提供できるようにコンテナの起動状態を定期的にチェックし、正しく起動できなくなったコンテナを再起動させたり、外部からのアクセスを遮断させたりする機能を提供していました。
 
-詳しい内容や詳細は次のリンク先をご参照頂ければと思います。
+詳しい内容や詳細は次のリンク先をご参照ください。
 https://docs.openshift.com/container-platform/4.5/applications/application-health.html
 https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 
-今回は新しく追加されたstartupProbeという起動フェーズを別途監視できる機能にフォーカスしてみてみたいと思います。
+今回は新しく追加されたstartupProbeという起動フェーズを別のアプローチで監視できる機能にフォーカスしてみてみたいと思います。
 
 ## startupProbeが追加された背景
 
 起動まである程度時間が必要なコンテナの場合はlivenessProbeのinitialDelaySeconds（コンテナ起動後、最初Probeが実施されるまでの秒数を指定する項目）で初期化が成功していたか確認して失敗された場合はコンテナを再起動させて改めてコンテナの初期化が実施できるように構成する必要がありました。ただし、livenessProbeはコンテナの起動時だけではなく全ライフサイクルをカバーする必要があるため、アプリケーションの起動時間がより長くなったり、大きく変動したりするとそれにフォーカスした設定が難しくなってしまいがちですが、その時startupProbeを利用して他のProbesと切り分けて設定できます。
 
-UpstreamでstartupProbe機能の設計関連文書は次のところをご参照ください。
+UpstreamでstartupProbe機能の設計については次のドキュメントをご参照ください。
 https://github.com/kubernetes/enhancements/blob/c872c41603f9822f6947256610feb2aae12b2253/keps/sig-node/20190221-livenessprobe-holdoff.md#summary
 
 ## startupProbeの設定と処理フロー
-startupProbeは既存livenessProbeと全く同じ方法で設定できるため、特別な設定などが追加されたわけではありませんが、startupProbeが設定された場合は、コンテナ起動後、他のprobesより先に評価されて成功と判定されない限り、コンテナが再起動されて次のProbesが開始されないところが既存処理フローと違います。
+startupProbeは既存livenessProbeと全く同じ方法で設定できるため、特別な設定などが追加されていません。異る点としては、startupProbeが設定された場合は、コンテナ起動後、他のprobesより先に評価されて成功と判定されない限り、コンテナが再起動されて次のProbesが開始されない点です。
 
-ちなみに、readinessProbeと違ってstartupProbeとlivenessProbeはsuccessThresholdを"1"しか指定できないです。
+ちなみに、readinessProbeと違ってstartupProbeとlivenessProbeはsuccessThresholdを"1"しか指定できません。
 https://github.com/openshift/origin/blob/47c0e715581cfb08dd54dd53e37c49b9182f0298/vendor/k8s.io/kubernetes/pkg/apis/core/validation/validation.go#L2739-L2747
 ```golang
   // Liveness-specific validation
@@ -95,7 +95,7 @@ spec:
         periodSeconds: 3
 ```
 
-先に以下の出力でstartupProbeが成功するまでlivenessProbeとreadinessProbeが一切開始されないことが確認できます。
+以下の出力でstartupProbeが成功するまでlivenessProbeとreadinessProbeが一切開始されないことが確認できます。
 ```console
 Start time :  Tuesday September, 22 2020 08:27:43
 10.129.2.1 - - [22/Sep/2020 08:27:44] "GET /startup_healthz HTTP/1.1" 500 -
@@ -134,4 +134,4 @@ Start time :  Tuesday September, 22 2020 08:36:03
 ```
 
 # まとめ
-簡単にstartupProbeがどのように動作するかみてみました。コンテナの稼働監視が起動フェーズと運用フェーズを分けて別途指定できるようになってより適切な監視ができて安定的なサービス監視及び提供に役に立つ構成が設定できるようになったと思います。また、この切り分けが可能になったことで依存サービスの監視及び起動順序の制御にもstartupProbeを活用してより簡単に設定できると思いますので皆さんもお試しください。
+簡単にstartupProbeがどのように動作するか見てみました。コンテナの稼働監視が起動フェーズと運用フェーズを分けて別途指定できるようになってより適切な監視ができて安定的なサービス監視及び提供に役に立つ構成が設定できるようになったと思います。また、この切り分けが可能になったことで依存サービスの監視及び起動順序の制御にもstartupProbeを活用してより簡単に設定できると思います。皆さんもお試しください。

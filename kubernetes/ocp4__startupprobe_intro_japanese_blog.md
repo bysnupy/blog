@@ -40,7 +40,7 @@ https://github.com/openshift/origin/blob/47c0e715581cfb08dd54dd53e37c49b9182f029
 ```
 
 他のProbesを含めてどのような処理フローになるかは以下の図の通りです。
-![ocp4__startupprobe_process](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__startupprobe_process.png)
+![ocp4__startupprobe_process](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__startupprobe_process_digram.png)
 
 設定項目の詳細説明は本記事では割愛していますが、以下のリンク先に詳しく紹介されています。
 

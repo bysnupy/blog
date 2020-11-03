@@ -28,7 +28,7 @@ Installing a cluster on bare metal in a restricted network
 
 全体的な構成は次のイメージの通りになります。
 
-![restricted_network_network_diagram]()
+![restricted_network_network_diagram](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__restricted_network_ocp_diagram.png)
 
 ### ノード及び作業ホスト構成
 
@@ -51,10 +51,10 @@ worker3.ocp46rt.priv.local | RHCOS | 192.168.9.37 | 16 | 16 GB | 50GB + 100GB | 
 次の構成に合わせて踏み台ホスト（bastion）にHAProxyを利用して構築します。
 
 API Load Balancer
-![restricted_network_lb_api]()
+![restricted_network_lb_api](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__restricted_network_api_lb.png)
 
 Application Ingress Load Balancer
-![restricted_network_lb_ingress]()
+![restricted_network_lb_ingress](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__restricted_network_ingress_lb.png)
 
 詳細はドキュメントを参照してください。
 
@@ -215,7 +215,7 @@ Installing the CLI on Linux
 この作業はインターネットにアクセスできない"bastion"ホストで実施されます。
 
 ```console
-user1@bastion ~$ dig +short quay.io
+user1@bastion ~$ dig +short mirror.reg.priv.local
 192.168.9.50
 
 user1@bastion ~$ oc version

@@ -435,20 +435,18 @@ user2@bastion ~$ cat install_dir/manifests/cluster-scheduler-02-config.yml | gre
   mastersSchedulable: false
 ```
 
-ノードホスト起動時にネットワーク経由でIgnitionファイルとBIOSイメージが取得できるようIgnition生成する前にweb serverも設定しておきます。
-Web server(httpd)をインストールしてポートを8080にし、次の通りDocumentRootディレクトリを設定します。
+ノードホスト起動時にネットワーク経由でIgnitionファイルが取得できるようIgnition生成する前にweb serverも設定しておきます。
+Web server(httpd)をインストールしてポートを8080にして次の通りDocumentRootを設定します。
 
 ```
-/var/www/html/ocp46/
+/var/www/html/ocp46rt/
 ├── ign
-│   ├── bootstrap.ign (owner: apache, group: apache, 0644)
-│   ├── master.ign    (owner: apache, group: apache, 0644)
-│   └── worker.ign    (owner: apache, group: apache, 0644)
-└── img
-    └── rhcos-4.6.1-x86_64-metal.x86_64.raw.gz   (owner: apache, group: apache, 0400)
+    ├── bootstrap.ign (owner: apache, group: apache, 0644)
+    ├── master.ign    (owner: apache, group: apache, 0644)
+    └── worker.ign    (owner: apache, group: apache, 0644)
 ```
 
-続いてIgnitionファイルを生成して"cloud.redhat.com"から取得したBIOSイメージと一緒にweb serverのDocumentRoot下に適切にコピーし、参照できるようにアクセス権限も調整します。
+Ignitionファイルの生成
 ```
 user2@bastion ~$ openshift-install create ignition-configs --dir install_dir
 INFO Consuming Worker Machines from target directory 
@@ -458,7 +456,100 @@ INFO Consuming Openshift Manifests from target directory
 INFO Consuming OpenShift Install (Manifests) from target directory 
 INFO Ignition-Configs created in: install_dir and install_dir/auth
 
-user2@bastion ~$ cp install_dir/*.ign /var/www/html/ocp46/ign/
-user2@bastion ~$ cp rhcos-4.6.1-x86_64-metal.x86_64.raw.gz /var/www/html/ocp46/img/
-user2@bastion ~$ sudo chown apache:apache -R /var/www/html/ocp45/*
+user2@bastion ~$ cp install_dir/*.ign /var/www/html/ocp46rt/ign/
+user2@bastion ~$ sudo chown apache:apache -R /var/www/html/ocp46rt/*
+```
+
+"rhcos-4.6.1-x86_64-live.x86_64.iso"を持ってBootstrapノードホストを先に起動させてから、続いてMasterノードホスト1〜3号機を同じISOで起動してから
+コンソールを通して必要なネットワーク設定を実施した後、coreos-installerを利用してネットワーク及びIgnition設定を適用して再起動するとBootStrapが初期化完了した次第Masterノードも初期化されます。
+直接カーネルパラメータを利用してRHCOSをインストールする方法も有効なので、そちらの詳細は次のドキュメントを見てください。
+
+Advanced RHCOS installation reference
+  https://docs.openshift.com/container-platform/4.6/installing/installing_bare_metal/installing-restricted-networks-bare-metal.html#installation-user-infra-machines-static-network_installing-restricted-networks-bare-metal
+
+自分の環境ではDHCPがネットワークで既に設定されていて、カーネルパラメータでネットワーク設定しないと"--copy-network"を利用して固定IPが正しく設定できなかったので"--append-karg"を利用してネットワーク設定していますが、
+"--copy-network"オプションは"nmcli"で設定した内容をRHCOSに投入してくれますので、より自由にネットワークが設定できると思います。ご利用環境に合わせてお試しください。
+
+```console
+$ sudo nmcli con mod "Wired Connection" ipv4.method manual \
+  ipv4.addresses 192.168.9.xx/24 ipv4.gateway 192.168.9.10 \
+  ipv4.dns 192.168.9.10
+$ sudo nmcli con down "Wired Connection"
+$ sudo nmcli con up   "Wired Connection"
+$ sudo nmcli general hostname master1.ocp46rt.priv.local
+$ sudo coreos-installer install /dev/sda \
+  --ignition-url=http://192.168.9.10:8080/ocp46rt/ign/master.ign \
+  --insecure-ignition \
+  --append-karg "ip=192.168.9.xx::192.168.9.10:255.255.255.0:HOSTNAME.ocp45rt.priv.local:ens3:none nameserver=192.168.9.10" 
+```
+
+Masterノード設定例、
+![rhcos_coreos_installer_example](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__rhcos_coreos_installer_config_example.png)
+
+Bootstrap及び全Masterノードを起動してからbootstrapプロセスが完了するまで待機します。
+
+```console
+user2@bastion ~$ openshift-install wait-for bootstrap-complete --dir install_dir --log-level debug
+DEBUG OpenShift Installer 4.6.1                    
+DEBUG Built from commit ebdbda57fc18d3b73e69f0f2cc499ddfca7e6593 
+INFO Waiting up to 20m0s for the Kubernetes API at https://api.ocp46rt.example.com:6443... 
+:
+INFO API v1.19.0+d59ce34 up                       
+INFO Waiting up to 30m0s for bootstrapping to complete... 
+:
+INFO It is now safe to remove the bootstrap resources 
+DEBUG Time elapsed per stage:                      
+DEBUG Bootstrap Complete: 7m58s                    
+DEBUG                API: 2m52s                    
+INFO Time elapsed: 7m58s   
+```
+
+無事完了したらインストールしたクラスタに認証してWorkerノードを追加します。
+
+```console
+user2@bastion ~$ export KUBECONFIG=/home/user2/install_dir/auth/kubeconfig
+
+user2@bastion ~$ oc get node
+NAME                         STATUS   ROLES    AGE    VERSION
+master1.ocp46rt.priv.local   Ready    master   122m   v1.19.0+d59ce34
+master2.ocp46rt.priv.local   Ready    master   64m    v1.19.0+d59ce34
+master3.ocp46rt.priv.local   Ready    master   17m    v1.19.0+d59ce34
+```
+
+Masterノードと同じ手順でWorkerノードの初期設定を実施します。暫く時間が経つとWorkerノードからのCSR(クライアントとサーバ証明書)が一覧されますので承認してWorkerノードをReadyにして追加します。
+
+```
+user2@bastion ~$ oc get csr | grep Pending
+csr-8zz9h   5m31s   kubernetes.io/kube-apiserver-client-kubelet   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+csr-ltb9x   8m23s   kubernetes.io/kube-apiserver-client-kubelet   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+csr-nh6v6   75s     kubernetes.io/kube-apiserver-client-kubelet   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+
+user2@bastion ~$ oc get csr -o name | xargs oc adm certificate approve
+:
+
+user2@bastion ~$ oc get node
+NAME                         STATUS     ROLES    AGE    VERSION
+master1.ocp46rt.priv.local   Ready      master   166m   v1.19.0+d59ce34
+master2.ocp46rt.priv.local   Ready      master   108m   v1.19.0+d59ce34
+master3.ocp46rt.priv.local   Ready      master   61m    v1.19.0+d59ce34
+worker1.ocp46rt.priv.local   NotReady   worker   104s   v1.19.0+d59ce34
+worker2.ocp46rt.priv.local   NotReady   worker   0s     v1.19.0+d59ce34
+worker3.ocp46rt.priv.local   NotReady   worker   106s   v1.19.0+d59ce34
+
+user2@bastion ~$ oc get csr | grep Pending
+csr-4c8fp   2m26s   kubernetes.io/kubelet-serving                 system:node:worker3.ocp46rt.priv.local                                      Pending
+csr-dvpdl   2m25s   kubernetes.io/kubelet-serving                 system:node:worker1.ocp46rt.priv.local                                      Pending
+csr-rd5lr   40s     kubernetes.io/kubelet-serving                 system:node:worker2.ocp46rt.priv.local                                      Pending
+
+user2@bastion ~$ oc get csr -o name | xargs oc adm certificate approve
+:
+
+user2@bastion ~$ oc get node
+NAME                         STATUS   ROLES    AGE     VERSION
+master1.ocp46rt.priv.local   Ready    master   168m    v1.19.0+d59ce34
+master2.ocp46rt.priv.local   Ready    master   110m    v1.19.0+d59ce34
+master3.ocp46rt.priv.local   Ready    master   63m     v1.19.0+d59ce34
+worker1.ocp46rt.priv.local   Ready    worker   3m37s   v1.19.0+d59ce34
+worker2.ocp46rt.priv.local   Ready    worker   112s    v1.19.0+d59ce34
+worker3.ocp46rt.priv.local   Ready    worker   3m39s   v1.19.0+d59ce34
 ```

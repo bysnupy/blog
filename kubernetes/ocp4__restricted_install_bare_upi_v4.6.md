@@ -14,8 +14,8 @@ Extended Update Support(EUS)が提供されるOpenShift 4.6が多くの改善と
 * インストール構成の概要
 * インストールの事前準備
   * ノード及び作業ホスト構成
-  * Load Balancerの構成
   * DNSレコード
+  * Load Balancerの構成
   * Mirrorレジストリの構成
 * インストールの実施
 
@@ -45,6 +45,31 @@ worker1.ocp46rt.priv.local | RHCOS | 192.168.9.35 | 16 | 16 GB | 50GB + 100GB | 
 worker2.ocp46rt.priv.local | RHCOS | 192.168.9.36 | 16 | 16 GB | 50GB + 100GB | Workerノード
 worker3.ocp46rt.priv.local | RHCOS | 192.168.9.37 | 16 | 16 GB | 50GB + 100GB | Workerノード
 
+### DNSレコード
+
+こちらではOpenShiftがインストールされるネットワーク制限環境とそれ以外のネットワークでDNSがそれぞれ存在していて次の通り各ネームサーバに登録するレコードは次の通りになります。
+ネットワーク制限環境で外部ネットワークを経由しないでoc CLIを利用するため、apiやingressのVIPレコードを重複して登録しています。
+
+ネットワーク制限環境用のDNSに登録が必要なレコード
+ホスト名 | IPs  |  備考
+--------|------|-------
+mirror.reg.priv.local | 192.168.9.50 | 
+api.ocp46rt.priv.local | 192.168.9.10 | API load balancerの内部向けVIP
+api-int.ocp46rt.priv.local | 192.168.9.10 | API load balancerの内部向けVIP
+*.apps.ocp46rt.example.com | 192.168.9.10 | Ingress load balancerの内部向けVIP
+bootstrap.ocp46rt.priv.local | 192.168.9.31 | 
+master1.ocp46rt.priv.local | 192.168.9.32 | 
+master2.ocp46rt.priv.local | 192.168.9.33 | 
+master3.ocp46rt.priv.local | 192.168.9.34 |  
+worker1.ocp46rt.priv.local | 192.168.9.35 | 
+worker2.ocp46rt.priv.local | 192.168.9.36 | 
+worker3.ocp46rt.priv.local | 192.168.9.37 | 
+
+その他のネットワークからLBを経由してOpenShiftにアクセスするために必要なDNSレコード
+ホスト名 | IPs  |  備考
+--------|------|-------
+api.ocp46rt.priv.local | 10.0.1.10 | API load balancerの外向けVIP
+*.apps.ocp46rt.example.com | 10.0.1.10 | Ingress load balancerの外向けVIP
 
 ### Load Balancerの構成
 
@@ -60,32 +85,91 @@ Application Ingress Load Balancer
 
 Networking requirements for user-provisioned infrastructure
   https://docs.openshift.com/container-platform/4.6/installing/installing_bare_metal/installing-restricted-networks-bare-metal.html#installation-network-user-infra_installing-restricted-networks-bare-metal
+  
+踏み台ホスト(bastion)にHAProxyをインストールして次の通り設定します。
+```console
+# API for External
+frontend external-lb-for-api-ocp46rt
+  bind    10.0.1.10:6443
+  option  tcplog
+  mode    tcp
+  default_backend  backend-api-6443-ocp46rt
 
-### DNSレコード
+# API for Ingernal
+frontend internal-lb-for-api-ocp46rt
+  bind    192.168.9.10:6443
+  option  tcplog
+  mode    tcp
+  default_backend  backend-api-6443-ocp46rt
 
-こちらではOpenShiftがインストールされるネットワーク制限環境とそれ以外のネットワークでDNSがそれぞれ存在していて次の通り各ネームサーバに登録するレコードは次の通りになります。
-ネットワーク制限環境で外部ネットワークを経由しないでoc CLIを利用するため、apiやingressのVIPレコードを重複して登録しています。
+frontend internal-lb-for-machineconfig-ocp46rt
+  bind    192.168.9.10:22623
+  option  tcplog
+  mode    tcp
+  default_backend  backend-machineconfig-22623-ocp46rt
 
-ネットワーク制限環境用のDNSに登録が必要なレコード
-ホスト名 | IPs  |  備考
---------|------|-------
-bootstrap.ocp46rt.priv.local | 192.168.9.31 | 
-mirror.reg.priv.local | 192.168.9.50 | 
-api.ocp46rt.priv.local | 192.168.9.10 | API load balancerの内部向けVIP
-api-int.ocp46rt.priv.local | 192.168.9.10 | API load balancerの内部向けVIP
-*.apps.ocp46rt.example.com | 192.168.9.10 | Ingress load balancerの内部向けVIP
-master1.ocp46rt.priv.local | 192.168.9.32 | 
-master2.ocp46rt.priv.local | 192.168.9.33 | 
-master3.ocp46rt.priv.local | 192.168.9.34 |  
-worker1.ocp46rt.priv.local | 192.168.9.35 | 
-worker2.ocp46rt.priv.local | 192.168.9.36 | 
-worker3.ocp46rt.priv.local | 192.168.9.37 | 
+# Ingress for External
+frontend external-lb-for-ingressrouter-HTTP-ocp46rt
+  bind    10.0.1.10:80
+  option  tcplog
+  mode    tcp
+  default_backend  backend-ingressrouter-80-ocp46rt
 
-その他のネットワークからLBを経由してOpenShiftにアクセスするために必要なDNSレコード
-ホスト名 | IPs  |  備考
---------|------|-------
-api.ocp46rt.priv.local | 10.0.1.10 | API load balancerの外向けVIP
-*.apps.ocp46rt.example.com | 10.0.1.10 | Ingress load balancerの外向けVIP
+frontend external-lb-for-ingressrouter-HTTPS-ocp46rt
+  bind    10.0.1.10:443
+  option  tcplog
+  mode    tcp
+  default_backend  backend-ingressrouter-443-ocp46rt
+
+# Ingress for Internal
+frontend internal-lb-for-ingressrouter-HTTP-ocp46rt
+  bind    192.168.9.10:80
+  option  tcplog
+  mode    tcp
+  default_backend  backend-ingressrouter-80-ocp46rt
+
+frontend internal-lb-for-ingressrouter-HTTPS-ocp46rt
+  bind    192.168.9.10:443
+  option  tcplog
+  mode    tcp
+  default_backend  backend-ingressrouter-443-ocp46rt
+
+# Master node pool for API
+backend backend-api-6443-ocp46rt
+  mode     tcp
+  balance  roundrobin
+  option   ssl-hello-chk
+  server   bootstrap  bootstrap.ocp46rt.priv.local:6443 check
+  server   master1    master1.ocp46rt.priv.local:6443   check
+  server   master2    master2.ocp46rt.priv.local:6443   check
+  server   master3    master3.ocp46rt.priv.local:6443   check
+
+# Master node pool for machineconfig
+backend backend-machineconfig-22623-ocp46rt
+  mode     tcp
+  balance  roundrobin
+  option   ssl-hello-chk
+  server   bootstrap  bootstrap.ocp46rt.priv.local:22623 check
+  server   master1    master1.ocp46rt.priv.local:22623   check
+  server   master2    master2.ocp46rt.priv.local:22623   check
+  server   master3    master3.ocp46rt.priv.local:22623   check
+
+# Worker node pool for Ingress router
+backend backend-ingressrouter-80-ocp46rt
+  mode     tcp
+  balance  roundrobin
+  server   worker1    worker1.ocp46rt.priv.local:80  check
+  server   worker2    worker2.ocp46rt.priv.local:80  check
+  server   worker3    worker3.ocp46rt.priv.local:80  check
+
+backend backend-ingressrouter-443-ocp46rt
+  mode     tcp
+  balance  roundrobin
+  option   ssl-hello-chk
+  server   worker1    worker1.ocp46rt.priv.local:443 check
+  server   worker2    worker2.ocp46rt.priv.local:443 check
+  server   worker3    worker3.ocp46rt.priv.local:443 check
+```
 
 ### Mirrorレジストリの構成
 
@@ -244,7 +328,6 @@ user2@bastion ~$ source ./source_file_for_upload_images
 ```
 
 転送されたイメージをミラーレジストリにアップロードします。
-
 Go言語のバージョンによる証明書関連の仕様変更によって次のメッセージでアップロードできない場合がありますが、"GODEBUG=x509ignoreCN=0"を指定して再実行してください。
 
 ```console
@@ -265,4 +348,116 @@ mirror.reg.priv.local:5000/
 info: Mirroring completed in 1m10.82s (97.37MB/s)
 ```
 
+最後に次のコマンドで"openshift-install"インストーラーバイナリにミラーレジストリに固定させたものとしてビルドしたものを取得する手順が残っていますが、こちらはquay.ioにアクセスしようとする既知の不具合の影響でv4.6.1では実施しないで、代りにインストールするOpenShiftと同じバージョンのopenshift-installバイナリを利用してください。
+
+```console
+$ GODEBUG=x509ignoreCN=0 oc adm -a ${LOCAL_SECRET_JSON} release extract \
+  --command=openshift-install \
+  "${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}:${OCP_RELEASE}-${ARCHITECTURE}"
+error: unable to read image quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:...: unauthorized: access to the requested resource is not authorized
+```
+
+詳細内容はこちらのバグレポートをご参考ください。
+oc adm release extract --command, --tools doesn't pull from localregistry when given a localregistry/image 
+  https://bugzilla.redhat.com/show_bug.cgi?id=1823143
+
 これでインストールに必要なミラーレジストリが用意できました。次はOpenShift 4.6をインストールしてみましょう。
+
+## インストールの実施
+
+こちらの作業は踏み台ホスト(bastion)で全て実施されます。
+
+SSHキーペアの準備はドキュメントを参照して事前に作成しておきます。
+
+Generating an SSH private key and adding it to the agent
+  https://docs.openshift.com/container-platform/4.6/installing/installing_bare_metal/installing-restricted-networks-bare-metal.html#ssh-agent-using_installing-restricted-networks-bare-metal
+
+インストール設定ファイルの手動作成してその中にミラーレジストリのCA証明書、SSHキーとイメージをダウンロードする時取得した"imageContentSources"のミラーレジストリーの情報を追加します。
+
+
+```yaml
+user2@bastion ~$ mkdir install_dir
+user2@bastion ~$ cat <<EOF > install_dir/install-config.yaml
+apiVersion: v1
+baseDomain: example.com
+compute:
+- hyperthreading: Enabled   
+  name: worker
+  replicas: 0 
+controlPlane:
+  hyperthreading: Enabled   
+  name: master 
+  replicas: 3 
+metadata:
+  name: ocp46rt
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14 
+    hostPrefix: 23 
+  networkType: OpenShiftSDN
+  serviceNetwork: 
+  - 172.30.0.0/16
+platform:
+  none: {} 
+fips: false 
+pullSecret: '{"auths":{"mirror.reg.priv.local:5000":{"auth":...}}}'
+sshKey: 'ssh-rsa ...'
+additionalTrustBundle: |
+  -----BEGIN CERTIFICATE-----
+  ...
+  -----END CERTIFICATE-----
+imageContentSources:
+- mirrors:
+  - mirror.reg.priv.local:5000/ocp4/openshift4
+  source: quay.io/openshift-release-dev/ocp-release
+- mirrors:
+  - mirror.reg.priv.local:5000/ocp4/openshift4
+  source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+EOF
+```
+
+デフォルトでユーザーPodのスケジュールがMasterノードにも有効になっていますが、control plane系の安定稼動のためこちらを無効にします。
+
+```console
+user2@bastion ~$ openshift-install version
+openshift-install 4.6.1
+:
+
+user2@bastion ~$ openshift-install create manifests --dir install_dir
+INFO Consuming Install Config from target directory 
+WARNING Making control-plane schedulable by setting MastersSchedulable to true for Scheduler cluster settings 
+INFO Manifests created in: install_dir/manifests and install_dir/openshift
+
+user2@bastion ~$ sed -i 's/mastersSchedulable: true/mastersSchedulable: false/' install_dir/manifests/cluster-scheduler-02-config.yml 
+user2@bastion ~$ cat install_dir/manifests/cluster-scheduler-02-config.yml | grep mastersSchedulable
+  mastersSchedulable: false
+```
+
+ノードホスト起動時にネットワーク経由でIgnitionファイルとBIOSイメージが取得できるようIgnition生成する前にweb serverも設定しておきます。
+
+Web server(httpd)をインストールしてポートを8080にして次の通りDocumentRootを設定します。
+
+```
+/var/www/html/ocp46/
+├── ign
+│   ├── bootstrap.ign (owner: apache, group: apache, 0644)
+│   ├── master.ign    (owner: apache, group: apache, 0644)
+│   └── worker.ign    (owner: apache, group: apache, 0644)
+└── img
+    └── rhcos-4.6.1-x86_64-metal.x86_64.raw.gz   (owner: apache, group: apache, 0400)
+```
+
+Ignitionファイルの生成
+```
+user2@bastion ~$ openshift-install create ignition-configs --dir install_dir
+INFO Consuming Worker Machines from target directory 
+INFO Consuming Master Machines from target directory 
+INFO Consuming Common Manifests from target directory 
+INFO Consuming Openshift Manifests from target directory 
+INFO Consuming OpenShift Install (Manifests) from target directory 
+INFO Ignition-Configs created in: install_dir and install_dir/auth
+
+user2@bastion ~$ cp install_dir/*.ign /var/www/html/ocp46/ign/
+user2@bastion ~$ cp rhcos-4.6.1-x86_64-metal.x86_64.raw.gz /var/www/html/ocp46/img/
+user2@bastion ~$ sudo chown apache:apache -R /var/www/html/ocp45/*
+```

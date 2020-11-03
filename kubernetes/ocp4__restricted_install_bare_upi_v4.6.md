@@ -18,6 +18,7 @@ Extended Update Support(EUS)が提供されるOpenShift 4.6が多くの改善と
   * Load Balancerの構成
   * Mirrorレジストリの構成
 * インストールの実施
+* インストールの完了
 
 ## インストール構成の概要
 
@@ -261,7 +262,7 @@ user1@image-down ~$
 
 先程作成したディレクトリにインストールに必要なイメージをダウンロードします。
 
-```
+```console
 user1@image-down ~$ oc adm release mirror -a ${LOCAL_SECRET_JSON} \
                        --to-dir=${REMOVABLE_MEDIA_PATH}/mirror \
                        quay.io/${PRODUCT_REPO}/${RELEASE_NAME}:${OCP_RELEASE}-${ARCHITECTURE}
@@ -284,7 +285,7 @@ user1@image-down ~$ du -hs ./copied_images/
 
 ダウンロードしたイメージは内部でシンボリックリンクが利用されているため、tarでアーカイブするか"rsync -a"などでその構成を維持して踏み台ホストに転送してください。
 
-```
+```console
 user1@image-down ~$ rsync -avc ./copied_images/* user2@bastion:copied_images_bastion/
 :
 sent 6,981,691,453 bytes  received 9,832 bytes  58,424,278.54 bytes/sec
@@ -438,7 +439,7 @@ user2@bastion ~$ cat install_dir/manifests/cluster-scheduler-02-config.yml | gre
 ノードホスト起動時にネットワーク経由でIgnitionファイルが取得できるようIgnition生成する前にweb serverも設定しておきます。
 Web server(httpd)をインストールしてポートを8080にして次の通りDocumentRootを設定します。
 
-```
+```console
 /var/www/html/ocp46rt/
 ├── ign
     ├── bootstrap.ign (owner: apache, group: apache, 0644)
@@ -447,7 +448,7 @@ Web server(httpd)をインストールしてポートを8080にして次の通�
 ```
 
 Ignitionファイルの生成
-```
+```console
 user2@bastion ~$ openshift-install create ignition-configs --dir install_dir
 INFO Consuming Worker Machines from target directory 
 INFO Consuming Master Machines from target directory 
@@ -518,7 +519,7 @@ master3.ocp46rt.priv.local   Ready    master   17m    v1.19.0+d59ce34
 
 Masterノードと同じ手順でWorkerノードの初期設定を実施します。暫く時間が経つとWorkerノードからのCSR(クライアントとサーバ証明書)が一覧されますので承認してWorkerノードをReadyにして追加します。
 
-```
+```console
 user2@bastion ~$ oc get csr | grep Pending
 csr-8zz9h   5m31s   kubernetes.io/kube-apiserver-client-kubelet   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
 csr-ltb9x   8m23s   kubernetes.io/kube-apiserver-client-kubelet   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
@@ -553,3 +554,63 @@ worker1.ocp46rt.priv.local   Ready    worker   3m37s   v1.19.0+d59ce34
 worker2.ocp46rt.priv.local   Ready    worker   112s    v1.19.0+d59ce34
 worker3.ocp46rt.priv.local   Ready    worker   3m39s   v1.19.0+d59ce34
 ```
+
+Image Registryを"managementState":"Managed"にして適切なストレージを設定して有効にします。こちらではemptyDirに設定していますが、その他のストレージの設定は次のドキュメントを参照してください。
+
+Image registry storage configuration
+  https://docs.openshift.com/container-platform/4.6/installing/installing_bare_metal/installing-restricted-networks-bare-metal.html#installation-registry-storage-config_installing-restricted-networks-bare-metal
+
+```
+user2@bastion ~$ oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}}}'
+user2@bastion ~$ oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed"}}'
+```
+
+全てのClusterOperatorが"AVAILABLE: True"になっているか確認した後、インストールを完了させます。
+
+```console
+user2@bastion ~$ oc get clusteroperators
+NAME                                       VERSION   AVAILABLE   PROGRESSING   DEGRADED   SINCE
+authentication                             4.6.1     True        False         False      89s
+cloud-credential                           4.6.1     True        False         False      4h49m
+cluster-autoscaler                         4.6.1     True        False         False      179m
+config-operator                            4.6.1     True        False         False      3h
+console                                    4.6.1     True        False         False      64s
+csi-snapshot-controller                    4.6.1     True        False         False      179m
+dns                                        4.6.1     True        False         False      178m
+etcd                                       4.6.1     True        False         False      75m
+image-registry                             4.6.1     True        False         False      70m
+ingress                                    4.6.1     True        False         False      2m59s
+insights                                   4.6.1     True        False         False      3h
+kube-apiserver                             4.6.1     True        False         False      73m
+kube-controller-manager                    4.6.1     True        False         False      178m
+kube-scheduler                             4.6.1     True        False         False      177m
+kube-storage-version-migrator              4.6.1     True        False         False      177m
+machine-api                                4.6.1     True        False         False      179m
+machine-approver                           4.6.1     True        False         False      179m
+machine-config                             4.6.1     True        False         False      75m
+marketplace                                4.6.1     True        False         False      178m
+monitoring                                 4.6.1     True        False         False      69m
+network                                    4.6.1     True        False         False      3h
+node-tuning                                4.6.1     True        False         False      3h
+openshift-apiserver                        4.6.1     True        False         False      70m
+openshift-controller-manager               4.6.1     True        False         False      177m
+openshift-samples                          4.6.1     True        False         False      59m
+operator-lifecycle-manager                 4.6.1     True        False         False      179m
+operator-lifecycle-manager-catalog         4.6.1     True        False         False      179m
+operator-lifecycle-manager-packageserver   4.6.1     True        False         False      71m
+service-ca                                 4.6.1     True        False         False      3h
+storage                                    4.6.1     True        False         False      3h
+```
+
+## インストールの完了
+
+```console
+user2@bastion ~$ openshift-install wait-for install-complete --log-level debug
+INFO Install complete!                            
+INFO To access the cluster as the system:admin user when using 'oc', run 'export KUBECONFIG=/root/clusters/ocp46rt/install_dir/auth/kubeconfig' 
+INFO Access the OpenShift web-console here: https://console-openshift-console.apps.ocp46rt.example.com 
+INFO Login to the console with user: "kubeadmin", and password: "..." 
+INFO Time elapsed: 0s 
+```
+
+これでOpenShift 4.6 Bare-metal UPIでのインストールが完了しました。その後、Post-Installの設定があると思いますが、機会があればその設定も紹介したいと思います。

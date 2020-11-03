@@ -42,9 +42,9 @@ bootstrap.ocp46rt.priv.local | RHCOS | 192.168.9.31 | 8 | 16GB | 50GB | Master�
 master1.ocp46rt.priv.local | RHCOS | 192.168.9.32 | 8 | 16GB | 100GB | Masterノード
 master2.ocp46rt.priv.local | RHCOS | 192.168.9.33 | 8 | 16GB | 100GB | Masterノード
 master3.ocp46rt.priv.local | RHCOS | 192.168.9.34 | 8 | 16GB | 100GB | Masterノード
-worker1.ocp46rt.priv.local | RHCOS | 192.168.9.35 | 16 | 16 GB | 50GB + 100GB | Workerノード
-worker2.ocp46rt.priv.local | RHCOS | 192.168.9.36 | 16 | 16 GB | 50GB + 100GB | Workerノード
-worker3.ocp46rt.priv.local | RHCOS | 192.168.9.37 | 16 | 16 GB | 50GB + 100GB | Workerノード
+worker1.ocp46rt.priv.local | RHCOS | 192.168.9.35 | 16 | 16 GB | 150GB | Workerノード
+worker2.ocp46rt.priv.local | RHCOS | 192.168.9.36 | 16 | 16 GB | 150GB | Workerノード
+worker3.ocp46rt.priv.local | RHCOS | 192.168.9.37 | 16 | 16 GB | 150GB | Workerノード
 
 ### DNSレコード
 

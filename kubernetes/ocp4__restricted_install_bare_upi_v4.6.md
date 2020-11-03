@@ -76,9 +76,11 @@ api.ocp46rt.priv.local | 10.0.1.10 | API load balancerの外向けVIP
 次の構成に合わせて踏み台ホスト（bastion）にHAProxyを利用して構築します。
 
 API Load Balancer
+
 ![restricted_network_lb_api](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__restricted_network_api_lb.png)
 
 Application Ingress Load Balancer
+
 ![restricted_network_lb_ingress](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__restricted_network_ingress_lb.png)
 
 詳細はドキュメントを参照してください。
@@ -434,8 +436,7 @@ user2@bastion ~$ cat install_dir/manifests/cluster-scheduler-02-config.yml | gre
 ```
 
 ノードホスト起動時にネットワーク経由でIgnitionファイルとBIOSイメージが取得できるようIgnition生成する前にweb serverも設定しておきます。
-
-Web server(httpd)をインストールしてポートを8080にして次の通りDocumentRootを設定します。
+Web server(httpd)をインストールしてポートを8080にし、次の通りDocumentRootディレクトリを設定します。
 
 ```
 /var/www/html/ocp46/
@@ -447,7 +448,7 @@ Web server(httpd)をインストールしてポートを8080にして次の通�
     └── rhcos-4.6.1-x86_64-metal.x86_64.raw.gz   (owner: apache, group: apache, 0400)
 ```
 
-Ignitionファイルの生成
+続いてIgnitionファイルを生成して"cloud.redhat.com"から取得したBIOSイメージと一緒にweb serverのDocumentRoot下に適切にコピーし、参照できるようにアクセス権限も調整します。
 ```
 user2@bastion ~$ openshift-install create ignition-configs --dir install_dir
 INFO Consuming Worker Machines from target directory 

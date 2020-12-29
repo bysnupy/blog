@@ -1,25 +1,19 @@
-# OpenShift and Multus Practical Dive
+# How does Multus work on OpenShift 4 with Operator ?
 
 ## Summary
 
-This article is a practical tutorial that demonstrates how to configure Multus on the running OpenShift 4.6 cluster.
-OpenShift Container Platform uses the Multus CNI for providing additional networks.
-It allows to define an additional network based on the various plugins of the Multus and attach one or more of these networks to your pods.
+OpenShift v4 is an Operator-Managed platform and Multus CNI is also managed by the Cluster Network Operator(CNO).
+We will discuss how you should use it on your OpenShift cluster for your multiple networks.
 
-Basically, Multus does not setup network directly, just call other various CNI plugins based on the Multus definition.
-Refer [Demystifying Multus](https://www.openshift.com/blog/demystifying-multus) for more details.
-Sometimes, it's confusing how to configure and work each other among multiple CNI plugins defined in the Multus.
-So I'd like to help your more understanding it through multiple practical demonstrations here.
+## Multus on OpenShift
 
-## Manifest overview
+OpenShift manages the additional network definition of the Multus using the Cluster Network Operator(CNO) and its CustomResource(CR).
+When you specify an additional network to the CNO CR, the CNO generates the `NetworkAttachmentDefinition` object automatically according to the CNO CR. 
+But you should not manually edit the `NetworkAttachmentDefinition` that CNO manages, it may disrupt your additional network.
 
-OpenShift manages the additional network definition of the Multus using the Cluster Network Operator(CNO) and its CustomerResource(CR).
-When you specify an additional network to create, the CNO creates the `NetworkAttachmentDefinition` object automatically,
-you can also your own `NetworkAttachmentDefinition`. 
-But you do not edit the `NetworkAttachmentDefinition` that CNO manages, it may disrupt your additional network.
-
-Let's see how to construct the CR for defining additional network as in the following example. 
-I will introduce limited plugins, such as bridge, host-device, ipvlan, macvlan within main plugins due to my limited test resources.
+Let's see how to construct the CR for defining additional network as in the following figure. 
+You can see some details about limited plugins here, such as bridge, host-device, ipvlan, macvlan within main plugins due to my limited test resources. 
+But it would be enough to make sense.
 
 ```yaml
 apiVersion: operator.openshift.io/v1

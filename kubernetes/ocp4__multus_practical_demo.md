@@ -1,19 +1,16 @@
-# How does Multus work on OpenShift 4 with Operator ?
+# How does Multus work on OpenShift ?
 
 ## Summary
 
 OpenShift v4 is an Operator-Managed platform and Multus CNI is also managed by the Cluster Network Operator(CNO).
 We will discuss how you should use it on your OpenShift cluster for your multiple networks.
 
-## Multus on OpenShift
+## Using Multus on OpenShift
 
-OpenShift manages the additional network definition of the Multus using the Cluster Network Operator(CNO) and its CustomResource(CR).
-When you specify an additional network to the CNO CR, the CNO generates the `NetworkAttachmentDefinition` object automatically according to the CNO CR. 
-But you should not manually edit the `NetworkAttachmentDefinition` that CNO manages, it may disrupt your additional network.
+OpenShift allows a pod to have multiple interfaces using Multus CNI that chains multiple plugins for the additional network attachment and management through the `NetworkAttachmentDefinition` object. In OpenShift case, the Cluster Network Operator(CNO) manages the `NetworkAttachmentDefinition` using CustomResource(CR).
+When you specify an additional network to the CNO CR, the CNO generates the `NetworkAttachmentDefinition` object automatically according to the CNO CR.
 
-Let's see how to construct the CR for defining additional network as in the following figure. 
-You can see some details about limited plugins here, such as bridge, host-device, ipvlan, macvlan within main plugins due to my limited test resources. 
-But it would be enough to make sense.
+Note that there are multiple network interface and IPAM(IP address management) options, and we should use network options appropriately for your use case.
 
 ```yaml
 apiVersion: operator.openshift.io/v1

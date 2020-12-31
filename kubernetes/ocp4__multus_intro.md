@@ -18,7 +18,7 @@ The bridge main plugin will create linux bridge interface without linking physic
 
 ![multus_bridge](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_bridge_figure2.png)
 
-The bridge plugin usually would work well with host-local and whereabouts IPAM plugins. For the following example, it's configured with whereabouts for assigning IP addresses dynamically across the cluster, but it does not mean access the pod across the cluster.
+The bridge plugin usually would work well with host-local and whereabouts IPAM plugins. For the following example, it's configured with whereabouts for assigning IP addresses dynamically across the cluster, but it does not mean a pod can access to another pod on the other node host through attached net1 interface.
 
 ```console
 $ oc edit networks.operator.openshift.io cluster
@@ -129,3 +129,87 @@ sh-4.4#
 ```
 
 We verified the bridge and whereabouts plugins are configured as expected.
+
+## Host-device for assigning dedicated host network device
+
+The host-device plugin moves the specified device on the host into the same network namespace of the pod, and the moved device cannot share with other pods.
+So it might consider to use with a pod having aggressive network workloads. But I think macvlan is more flexible and useful than this one usually.
+
+![multus_bridge](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_host_device_figure3.png)
+
+You need each `NetworkAttachmentDefinition` per each host network device you want to use, and static and whereabouts IPAMs are useful this time.
+Because it is required to avoid duplicated IP addresses across cluster.
+
+```console
+$ oc edit networks.operator.openshift.io cluster
+apiVersion: operator.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  additionalNetworks: 
+  - name: host-device-pod-a-main
+    namespace: multus-test
+    type: Raw
+    rawCNIConfig: '{
+      "cniVersion": "0.3.1",
+      "name": "host-device-pod-a-main",
+      "type": "host-device",
+      "device": "ens8",
+      "ipam": {
+          "type": "static",
+          "addresses": [
+              {
+                  "address": "192.168.12.10/24",
+                  "gateway": "192.168.12.1"
+              }
+          ]
+      }
+    }'
+  - name: host-device-pod-b-main
+    namespace: multus-test
+    type: Raw
+    rawCNIConfig: '{
+      "cniVersion": "0.3.1",
+      "name": "host-device-pod-b-main",
+      "type": "host-device",
+      "device": "ens9",
+      "ipam": {
+          "type": "static",
+          "addresses": [
+              {
+                  "address": "192.168.12.11/24",
+                  "gateway": "192.168.12.1"
+              }
+          ]
+      }
+    }'
+    ...snip...
+```
+
+```console
+$ oc get net-attach-def
+NAME                     AGE
+bridge-main              99m
+host-device-pod-a-main   107s
+host-device-pod-b-main   107s
+```
+
+There are two pods in the same node host, and check if the bridge is configured correctly using `ip link` command on the node host.
+```console
+// Check the pods IP addresses after specifying network you configured.
+$ oc patch deploy/pod-a \
+  --patch '{"spec":{"template":{"metadata":{"annotations":{"k8s.v1.cni.cncf.io/networks":"host-device-pod-a-main"}}}}}'
+$ oc patch deploy/pod-b \
+  --patch '{"spec":{"template":{"metadata":{"annotations":{"k8s.v1.cni.cncf.io/networks":"host-device-pod-b-main"}}}}}'
+
+$ oc get pod -o wide
+NAME                     READY   STATUS    RESTARTS   AGE   IP             NODE                         NOMINATED NODE   READINESS GATES
+pod-a-c58c4d6d-pnqvd     1/1     Running   0          47s   10.128.2.141   worker1.ocp46rt.priv.local   <none>           <none>
+pod-b-76dc9dd5cb-pthlh   1/1     Running   0          46s   10.128.2.140   worker1.ocp46rt.priv.local   <none>           <none>
+
+// Access the node host running the pods.
+$ oc debug node/worker1.ocp46rt.priv.local
+:
+sh-4.4# chroot /host
+```

@@ -18,7 +18,7 @@ The bridge main plugin will create linux bridge interface without linking physic
 
 ![multus_bridge](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_bridge_figure2.png)
 
-The bridge plugin can be available with static, host-local and whereabouts IPAM plugins. For the following example, it's configured with whereabouts for assigning IP addresses dynamically across the cluster.
+The bridge plugin usually would work well with host-local and whereabouts IPAM plugins. For the following example, it's configured with whereabouts for assigning IP addresses dynamically across the cluster, but it does not mean access the pod across the cluster.
 
 ```console
 $ oc edit networks.operator.openshift.io cluster

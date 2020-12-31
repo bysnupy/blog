@@ -10,7 +10,7 @@ In this article, I will briefly walk through using Multus on OpenShift focused e
 
 With OpenShift, Multus CNI is managed multiple networks by the Cluster Network Operator(CNO) using CustomResource(CR), when you specify an additional network to the CR, the CNO generates the `NetworkAttachmentDefinition` object automatically for Multus CNI.
 
-![multus_and_cno_operator](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_cno_figure1.png)
+![multus_and_cno_operator](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_cno_operator_figure1.png)
 
 ## Bridge for communication all containers on the same node host
 

@@ -60,7 +60,12 @@ bridge-main   24m
 
 There are two pods in the same node host, and check if the bridge is configured correctly using `ip link` command on the node host.
 ```console
-// Check the pods IP addresses.
+// Check the pods IP addresses after specifying network you configured.
+$ oc patch deploy/pod-a \
+  --patch '{"spec":{"template":{"metadata":{"annotations":{"k8s.v1.cni.cncf.io/networks":"bridge-main"}}}}}'
+$ oc patch deploy/pod-b \
+  --patch '{"spec":{"template":{"metadata":{"annotations":{"k8s.v1.cni.cncf.io/networks":"bridge-main"}}}}}'
+
 $ oc get pod -o wide
 NAME                     READY   STATUS    RESTARTS   AGE     IP            NODE                         NOMINATED NODE   READINESS GATES
 pod-a-5bb7694d4-j8g6b    1/1     Running   0          2m42s   10.128.2.20   worker1.ocp46rt.priv.local   <none>           <none>

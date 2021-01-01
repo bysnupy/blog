@@ -197,22 +197,23 @@ pod-b-cc754dd7-pq9km     1/1     Running   0          42m   10.130.2.13   worker
 You can also see DHCPOFFER logs for the pods at the DHCP server.
 If there are no dhcp-daemon DaemonSet pods in the "openshift-multus", when the dhcp IPAM is configured, it makes the pods run either.
 ```console
-// for Pod A
+// for "pod-a"
 DHCPDISCOVER(ens11) 00:1a:4a:16:06:76
 DHCPOFFER(ens11) 192.168.12.20 00:1a:4a:16:06:76
 DHCPREQUEST(ens11) 192.168.12.20 00:1a:4a:16:06:76
 DHCPACK(ens11) 192.168.12.20 00:1a:4a:16:06:76
 :
-// for Pod B
+// for "pod-b"
 DHCPDISCOVER(ens11) 00:1a:4a:16:06:81
 DHCPOFFER(ens11) 192.168.12.21 00:1a:4a:16:06:81
 DHCPREQUEST(ens11) 192.168.12.21 00:1a:4a:16:06:81
 DHCPACK(ens11) 192.168.12.21 00:1a:4a:16:06:81
 
-# oc get all -o wide -n openshift-multus
+# oc get pod -o wide -n openshift-multus
 NAME                                    READY   STATUS    RESTARTS   AGE     IP             NODE                         NOMINATED NODE   READINESS GATES
 pod/dhcp-daemon-5g4vq                   1/1     Running   0          1h12m   192.168.9.35   worker1.ocp46rt.priv.local   <none>           <none>
 pod/dhcp-daemon-5w9kj                   1/1     Running   0          1h12m   192.168.9.36   worker2.ocp46rt.priv.local   <none>           <none>
+:
 ```
 
 Check netns(network namespace) for running pod using `crictl inspectp` command on the node host first.

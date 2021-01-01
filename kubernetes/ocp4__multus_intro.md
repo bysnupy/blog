@@ -135,10 +135,10 @@ We verified the bridge and whereabouts plugins are configured as expected.
 The host-device plugin moves the specified device on the host into the same network namespace of only a pod, so the moved device cannot share with other pods.
 So you can consider to use this if your workload is required a dedicated physical interface.
 
-![multus_bridge](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_host_device_figure3.png)
+![multus_host_device](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_host_device_figure3.png)
 
 The attached interface keeps the physical mac address and it should not be duplicated IP addresses with the connected network,
-so you can use static, whereabouts and dhcp IPAMs. This time I will demonstrate host-device with dhcp IPAM.
+so you can use static, whereabouts and dhcp IPAMs. This time I will demonstrate host-device with dhcp IPAM, and you prepare a DHCP server in advance.
 
 ```console
 $ oc edit networks.operator.openshift.io cluster
@@ -172,8 +172,15 @@ bridge-main        22h
 host-device-main   19m
 ```
 
-There are two pods in the other node host, and check netns(network namespace) for one pod using `crictl inspectp` command on the node host.
+The two pods will run on the following worker nodes, and the specified ens8 MAC address is as follows on each node host.
+```console
+// worker1
+ens8: 00:1a:4a:16:06:76
 
+// worker2
+ens8: 00:1a:4a:16:06:81
+```
+After specifying `NetworkAttachmentDefinition` to each pod, you can see redeployed pods as follows.
 ```console
 // Check the pods IP addresses after specifying network you configured.
 $ oc patch deploy/pod-a \
@@ -184,8 +191,27 @@ $ oc patch deploy/pod-b \
 $  oc get pod -o wide -n multus-test
 NAME                     READY   STATUS    RESTARTS   AGE   IP            NODE                         NOMINATED NODE   READINESS GATES
 pod-a-66b77fb7f6-wbx5f   1/1     Running   0          56m   10.128.2.15   worker1.ocp46rt.priv.local   <none>           <none>
-pod-b-cc754dd7-pq9km     1/1     Running   0          42m   10.130.2.13   worker5.ocp46rt.priv.local   <none>           <none>
+pod-b-cc754dd7-pq9km     1/1     Running   0          42m   10.130.2.13   worker2.ocp46rt.priv.local   <none>           <none>
+```
 
+And you can also see DHCPOFFER logs for the pods at the DHCP server.
+```console
+// for Pod A
+DHCPDISCOVER(ens11) 00:1a:4a:16:06:76
+DHCPOFFER(ens11) 192.168.12.20 00:1a:4a:16:06:76
+DHCPREQUEST(ens11) 192.168.12.20 00:1a:4a:16:06:76
+DHCPACK(ens11) 192.168.12.20 00:1a:4a:16:06:76
+:
+// for Pod B
+DHCPDISCOVER(ens11) 00:1a:4a:16:06:81
+DHCPOFFER(ens11) 192.168.12.21 00:1a:4a:16:06:81
+DHCPREQUEST(ens11) 192.168.12.21 00:1a:4a:16:06:81
+DHCPACK(ens11) 192.168.12.21 00:1a:4a:16:06:81
+```
+
+Check netns(network namespace) for running pod using `crictl inspectp` command on the node host first.
+
+```console
 // Access the node host running the pods.
 $ oc debug node/worker1.ocp46rt.priv.local
 :
@@ -204,6 +230,56 @@ sh-4.4# crictl inspectp  --output json 352feb5afa9ca | \
 }
 sh-4.4#
 ```
-Test if the pods can communicate with web server in the external network using ip netns exec command as follows.
+
+Test if the pods can communicate with web server in the external network using `ip netns exec` command using above netns as follows.
 ```console
+// You can see the both pod IP and attached net1 IP addresses with MAC address.
+sh-4.4# ip netns exec 46775c43-417c-4b84-891b-0053bc45c006 ip a                       
+:
+3: eth0@if27: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UP group default 
+    link/ether 0a:58:0a:80:02:0f brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 10.128.2.15/23 brd 10.128.3.255 scope global eth0
+       valid_lft forever preferred_lft forever
+:
+4: net1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 00:1a:4a:16:06:76 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.12.20/24 brd 192.168.12.255 scope global net1
+       valid_lft forever preferred_lft forever
+:
+
+// Web server IP was 192.168.12.10 and 8080 port was listening, if accessed, return "Web server Running" message.
+sh-4.4# ip netns exec 46775c43-417c-4b84-891b-0053bc45c006 curl -vs http://192.168.12.10:8080/
+:
+< HTTP/1.1 200 OK
+< Date: Fri, 01 Jan 2021 08:32:48 GMT
+< Server: Apache/2.4.37 (Red Hat Enterprise Linux)
+:
+< 
+Web server Running
+* Connection #0 to host 192.168.12.10 left intact
+
+// And the source IP was 192.168.12.20 in the web server as follows.
+192.168.12.20 - - ... "GET / HTTP/1.1" 200 11 "-" "curl/7.61.1"
 ```
+
+The pod can access the other pod either using IP address.
+```
+sh-4.4# ip netns exec 46775c43-417c-4b84-891b-0053bc45c006 curl -vs http://192.168.12.21:8080/
+:
+< HTTP/1.0 200 OK
+< Server: SimpleHTTP/0.6 Python/2.7.5
+:
+< 
+Pod B
+* Closing connection 0
+sh-4.4#
+```
+We verified the host-device and dhcp plugins are configured as expected. If you use static plugin instead of dhcp, external DHCP server would not be required, but you should add each `NetworkAttachmentDefinition` for each network device with unique IP address across cluster.
+
+## MACvlan plugin for multiple interfaces with different MAC addresses on top of a single interface
+
+You can bind and share a physical interface that is associated with multiple macvlan interfaces directly without a bridge.
+And each macvlan has its own MAC address, it makes it easy to use additional network on multiple pods.
+
+![multus_macvlan](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_macvlan_figure4.png)
+

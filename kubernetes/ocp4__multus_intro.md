@@ -12,6 +12,8 @@ With OpenShift, Multus CNI is managed multiple networks by the Cluster Network O
 
 ![multus_and_cno_operator](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_cno_operator_figure1.png)
 
+Be careful for the following access flow diagram. It is simplified intentionally, even though the SDN is connected through the host network using VXLAN tunneling in realty, it's skipped the details for focusing Multus access flow.
+
 ## bridge plug-in for communication all containers on the same node host
 
 The bridge main plugin will create linux bridge interface without linking physical host interface and forwarding rules for external network, so it is desired container-to-container communication on the same node host.
@@ -266,7 +268,7 @@ Web server Running
 ```
 
 The pod can access another "pod-b" either using IP address.
-```
+```console
 sh-4.4# ip netns exec 46775c43-417c-4b84-891b-0053bc45c006 curl -vs http://192.168.12.21:8080/
 :
 < HTTP/1.0 200 OK
@@ -429,7 +431,7 @@ Web server Running
 ```
 
 The "pod-b" can access to "pod-a" using IP address.
-```
+```console
 sh-4.4# ip netns exec eb9f2dbf-6872-4318-9ed0-d0bdf6da7f72 curl -vs http://192.168.12.50:8080/
 :
 < HTTP/1.0 200 OK

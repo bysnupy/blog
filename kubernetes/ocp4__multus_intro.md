@@ -12,7 +12,7 @@ With OpenShift, Multus CNI is managed multiple networks by the Cluster Network O
 
 ![multus_and_cno_operator](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_cno_operator_figure1.png)
 
-Be careful for the following access flow diagram. It is simplified intentionally, even though the SDN is connected through the host network using VXLAN tunneling in realty, it's skipped the details for focusing Multus access flow.
+Be careful for the following access flow diagram. It is simplified intentionally, even though the SDN is connected through the host network using VXLAN tunneling in realty. It's skipped the details for focusing Multus access flow.
 
 ## bridge plug-in for communication all containers on the same node host
 

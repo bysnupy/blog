@@ -398,13 +398,15 @@ sh-4.4# ip netns exec eb9f2dbf-6872-4318-9ed0-d0bdf6da7f72 ip a
 :
 
 // List ipvlan in the pod network namespace
-sh-4.4# ip netns exec 2c0c43c6-d5ad-46b0-9bca-1d27cc3868b7 ip link show type ipvlan
+sh-4.4# ip netns exec 2c0c43c6-d5ad-46b0-9bca-1d27cc3868b7 ip -d link show type ipvlan
 4: net1@if26: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UNKNOWN mode DEFAULT group default 
-    link/ether 00:1a:4a:16:06:77 brd ff:ff:ff:ff:ff:ff        <--- MAC addresses is the same with parent ens9 interface.
+    link/ether 00:1a:4a:16:06:77 brd ff:ff:ff:ff:ff:ff promiscuity 0 minmtu 68 maxmtu 65535                    <--- the same MAC
+    ipvlan  mode l2 bridge addrgenmode eui64 numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535 <--- L2 mode
 
-sh-4.4# ip netns exec eb9f2dbf-6872-4318-9ed0-d0bdf6da7f72 ip link show type ipvlan
+sh-4.4# ip netns exec eb9f2dbf-6872-4318-9ed0-d0bdf6da7f72 ip -d link show type ipvlan
 4: net1@if26: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UNKNOWN mode DEFAULT group default 
-    link/ether 00:1a:4a:16:06:77 brd ff:ff:ff:ff:ff:ff        <--- MAC addresses is the same with parent ens9 interface.
+    link/ether 00:1a:4a:16:06:77 brd ff:ff:ff:ff:ff:ff promiscuity 0 minmtu 68 maxmtu 65535                    <--- the same MAC
+    ipvlan  mode l2 bridge addrgenmode eui64 numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535 <--- L2 mode
 
 // ping from "pod-a" to "pod-b"
 sh-4.4# ip netns exec 2c0c43c6-d5ad-46b0-9bca-1d27cc3868b7 ping -c1 192.168.12.51
@@ -444,11 +446,79 @@ sh-4.4#
 ```
 Next macvlan is similar with ipvlan except MAC address assign different one to each sub-interface with parent interface.
 
-## macvlan plug-in for multiple interfaces with different MAC addresses on top of a single interface
+## macvlan plug-in for multiple interfaces with eacg unique MAC address on top of a single interface
 
 You can bind and share one physical interface that is associated with multiple macvlan interfaces directly without a bridge.
 
 ![multus_macvlan](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_macvlan_flow_figure5.png)
 
-With macvlan, since connectivity are directly bound with underlay network using sub-interface having each MAC address, so it's simple to use like traditional network connectivity.
+With macvlan, since connectivity are directly bound with the underlay network using sub-interface having each MAC address,
+so it's simple to use like traditional network connectivity.
+And you can specify a basic configuration directly in YAML using limited IPAMs. Such as dhcp and static, this time I will use static one.
+
+You specify the `type: SimpleMacvlan` instead of `type: Raw` for a basic configuration in YAML, but you can also configure the same one in JSON either. 
+Refer [Configuring a macvlan network with basic customizations](https://docs.openshift.com/container-platform/4.6/networking/multiple_networks/configuring-macvlan-basic.html#configuring-macvlan-basic) for more details.
+
+```console
+$ oc edit networks.operator.openshift.io cluster
+apiVersion: operator.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  additionalNetworks: 
+  - name: macvlan-pod-a-main
+    namespace: multus-test
+    type: SimpleMacvlan
+    simpleMacvlanConfig:
+      master: ens9
+      mode: bridge
+      ipamConfig:
+        type: static
+        staticIPAMConfig:
+          addresses:
+          - address: 192.168.9.78/24
+            gateway: 192.168.9.1
+  - name: macvlan-pod-b-main
+    namespace: multus-test
+    type: SimpleMacvlan
+    simpleMacvlanConfig:
+      master: ens9
+      mode: bridge
+      ipamConfig:
+        type: static
+        staticIPAMConfig:
+          addresses:
+          - address: 192.168.9.79/24
+            gateway: 192.168.9.1
+    ...snip...
+```
+
+`NetworkAttachmentDefinition` defined in the above CR will be added as follows.
+
+```console
+$ oc get net-attach-def -n multus-test
+NAME           AGE
+macvlan-main   3s
+```
+
+The two pods will run on the same worker nodes, and the specified ens9 MAC address is as follows. 
+```console
+// worker1
+ens9: 00:1a:4a:16:06:77
+```
+
+After specifying `NetworkAttachmentDefinition` to each pod, you can see redeployed pods as follows.
+```console
+// Check the pods IP addresses after specifying network you configured.
+$ oc patch deploy/pod-a \
+  --patch '{"spec":{"template":{"metadata":{"annotations":{"k8s.v1.cni.cncf.io/networks":"macvlan-main"}}}}}'
+$ oc patch deploy/pod-b \
+  --patch '{"spec":{"template":{"metadata":{"annotations":{"k8s.v1.cni.cncf.io/networks":"macvlan-main"}}}}}'
+
+$  oc get pod -o wide -n multus-test
+NAME                     READY   STATUS    RESTARTS   AGE   IP            NODE                         NOMINATED NODE   READINESS GATES
+pod-a-77657b97c9-88rx6   1/1     Running   0          23s   10.128.2.19   worker1.ocp46rt.priv.local   <none>           <none>
+pod-b-7b66b495b8-98khk   1/1     Running   0          25s   10.128.2.18   worker1.ocp46rt.priv.local   <none>           <none>
+```
 

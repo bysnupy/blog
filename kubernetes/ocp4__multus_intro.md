@@ -457,7 +457,7 @@ so it's simple to use like traditional network connectivity.
 And you can specify a basic configuration directly in YAML using limited IPAMs. Such as dhcp and static, this time I will use static one.
 
 You specify the `type: SimpleMacvlan` instead of `type: Raw` for a basic configuration in YAML, but you can also configure the same one in JSON either. 
-Refer [Configuring a macvlan network with basic customizations](https://docs.openshift.com/container-platform/4.6/networking/multiple_networks/configuring-macvlan-basic.html#configuring-macvlan-basic) for more details.
+Refer [Configuring a macvlan network with basic customizations](https://docs.openshift.com/container-platform/4.6/networking/multiple_networks/configuring-macvlan-basic.html#configuring-macvlan-basic) for more details. The following two additional network configuration is just different on the format, but the context is the same each other.
 
 ```console
 $ oc edit networks.operator.openshift.io cluster
@@ -481,16 +481,23 @@ spec:
             gateway: 192.168.9.1
   - name: macvlan-pod-b-main
     namespace: multus-test
-    type: SimpleMacvlan
-    simpleMacvlanConfig:
-      master: ens9
-      mode: bridge
-      ipamConfig:
-        type: static
-        staticIPAMConfig:
-          addresses:
-          - address: 192.168.9.79/24
-            gateway: 192.168.9.1
+    type: Raw
+    rawCNIConfig: '{
+      "cniVersion": "0.3.1",
+      "name": "macvlan-pod-b-main",
+      "type": "macvlan",
+      "master": "ens9",
+      "mode": "bridge",
+      "ipam": {
+          "type": "static",
+          "addresses": [
+              {
+                  "address": "192.168.9.79/24",
+                  "gateway": "192.168.9.1"
+              }
+          ]
+      }
+    }'
     ...snip...
 ```
 
@@ -498,8 +505,9 @@ spec:
 
 ```console
 $ oc get net-attach-def -n multus-test
-NAME           AGE
-macvlan-main   3s
+NAME                 AGE
+macvlan-pod-a-main   1s
+macvlan-pod-b-main   1s
 ```
 
 The two pods will run on the same worker nodes, and the specified ens9 MAC address is as follows. 
@@ -512,13 +520,13 @@ After specifying `NetworkAttachmentDefinition` to each pod, you can see redeploy
 ```console
 // Check the pods IP addresses after specifying network you configured.
 $ oc patch deploy/pod-a \
-  --patch '{"spec":{"template":{"metadata":{"annotations":{"k8s.v1.cni.cncf.io/networks":"macvlan-main"}}}}}'
+  --patch '{"spec":{"template":{"metadata":{"annotations":{"k8s.v1.cni.cncf.io/networks":"macvlan-pod-a-main"}}}}}'
 $ oc patch deploy/pod-b \
-  --patch '{"spec":{"template":{"metadata":{"annotations":{"k8s.v1.cni.cncf.io/networks":"macvlan-main"}}}}}'
+  --patch '{"spec":{"template":{"metadata":{"annotations":{"k8s.v1.cni.cncf.io/networks":"macvlan-pod-b-main"}}}}}'
 
 $  oc get pod -o wide -n multus-test
-NAME                     READY   STATUS    RESTARTS   AGE   IP            NODE                         NOMINATED NODE   READINESS GATES
-pod-a-77657b97c9-88rx6   1/1     Running   0          23s   10.128.2.19   worker1.ocp46rt.priv.local   <none>           <none>
-pod-b-7b66b495b8-98khk   1/1     Running   0          25s   10.128.2.18   worker1.ocp46rt.priv.local   <none>           <none>
+NAME                     READY   STATUS    RESTARTS   AGE   IP             NODE                         NOMINATED NODE   READINESS GATES
+pod-a-5b4bccc955-mcbgs   1/1     Running   0          7s    10.128.2.199   worker1.ocp46rt.priv.local   <none>           <none>
+pod-b-77f487847-97k46    1/1     Running   0          5s    10.128.2.200   worker1.ocp46rt.priv.local   <none>           <none>
 ```
 

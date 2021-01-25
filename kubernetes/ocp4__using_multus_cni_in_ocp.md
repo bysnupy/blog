@@ -4,7 +4,7 @@
 In this article, I will walk you through a simple summary of Multus and demonstrate how it works in OpenShift using some practical examples. It may be helpful to deepen your understanding of the Multus CNI alongside the official documentation.
 
 ## What is the Multus CNI ?
-CNI is the container network interface that provides a pluggable application programming interface to configure network interfaces in Linux containers. Multus CNI is such a plugin, and is referred to as a meta-plugin: a CNI plugin that can run other CNI plugins. It works like a wrapper which calls other CNI plugins for attaching multiple network interfaces to pods in OpenShift (Kubernetes). The following terms will be used in this article in order to distinguish them from each other. Refer to the CNI Documentation for more details for each plugin.
+CNI is the container network interface that provides a pluggable application programming interface to configure network interfaces in Linux containers. Multus CNI is such a plugin, and is referred to as a meta-plugin: a CNI plugin that can run other CNI plugins. It works like a wrapper which calls other CNI plugins for attaching multiple network interfaces to pods in OpenShift (Kubernetes). The following terms will be used in this article in order to distinguish them from each other. Refer to the [CNI Documentation](https://www.cni.dev/docs/) for more details for each plugin.
 
 Name | Description | Plugins
 -----|-------------|--------
@@ -12,13 +12,14 @@ Main plugin | Responsible for inserting a network interface into the container n
 IPAM plugin | Responsible for managing IP allocation within the Main plugin. | dhcp, host-local, static, whereabouts and so on.
 Other plugin | Typically does not work on the primary interface directly. The attributes are set on those interfaces. | tuning, route-override and so on.
 
-Multiple plugins can be configured for a single container using Network Configuration Lists, and an example is shown in the previously referenced document.
+Multiple plugins can be configured for a single container using [Network Configuration Lists](https://github.com/containernetworking/cni/blob/spec-v0.3.1/SPEC.md#network-configuration-lists), and an example is shown in the previously referenced document.
 
+![image1](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_img1.png)
 
 ## How does Multus work ?
 Additional network configurations based on Multus is managed by the Cluster Network Operator (CNO) in OpenShift and the Multus CNI is implemented through the NetworkAttachmentDefinition CR (CustomResource) being led by the Network Plumbing Working Group. Reconciliation is facilitated according to .spec.additionalNetworks in the networks.operator.openshift.io CR. The following diagram describes this process in detail.
 
-
+![image2](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_img2.png)
 
 Even though you can also directly create NetworkAttachmentDefinition CR without CNO, it is recommended that you use the CNO for the centralized management of your additional networks.
 
@@ -37,6 +38,7 @@ The diagrams provided in each of the following sections can be used to aid in th
 ### Bridge
 Act as a network switch between multiple pods on the same node host. In its current form, a bridge interface is created which does not link any physical host interface. As a result, connections are not made to any external networks including other pods on the other host nodes.
 
+![image3](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_img3.png)
 
 Configure the bridge plugin with host-local IPAM. The default bridge name is cni0 by default if the name is not specified  using bridge parameter.
 ```console
@@ -136,7 +138,7 @@ rtt min/avg/max/mdev = 0.219/0.219/0.219/0.000 ms
 ### Host-device
 This plugin makes a physical host interface move to a pod network namespace. When enabled, the specified host interface disappears in the root network namespace (default host network namespace). This behavior might affect recreating the pod in place on the same host as the host interface may not be found as it is specified by host-device plugin configuration.
 
-
+![image4](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_img4.png)
 
 This time, dhcp IPAM is configured and it would trigger the creation of the dhcp-daemon daemonset pods in openshift-multus namespace. The pod in daemon mode listens for an address from a DHCP server on OpenShift, whereas the DHCP server itself is not provided. In other words, it requires an existing DHCP server in the same network. This demonstration shows you the MAC address of the parent is kept in the pod network namespace. Additionally, the source IP and MAC address can be identified by using an external web server access test. 
 
@@ -224,6 +226,8 @@ This behavior is similar to the macvlan passthru mode, but passthru mode works a
 ### Ipvlan
 The ipvlan plugin may be used in the event that there are limited MAC addresses that can be used. This issue is common on some switch devices which restrict the maximum number of MAC addresses per physical port due to port security configurations. When operating in most cloud providers, you should  consider using ipvlan instead of macvlan as unknown MAC addresses are forbidden in VPC networks.
 
+![image5](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_img5.png)
+
 The sub-interface of the ipvlan can use distinct IP addresses with the same MAC address of the parent host interface. So, it would not work well with a DHCP server which depends on the MAC addresses. Parent host interface acts as a bridge (switch) with L2 mode, and it acts as a router with L3 mode of the ipvlan plug-in. In the following example, I use the whereabouts IPAM and L2 mode(default) will be used. Refer to the IPVLAN Driver HOWTO for additional details.
 ```console
 $ oc edit networks.operator.openshift.io cluster
@@ -303,6 +307,8 @@ Pod A
 ```
 ### Macvlan
 With macvlan, since the connectivity is directly bound with the underlying network using sub-interfaces each having MAC address, so it's simple to use as it aligns to traditional network connectivity.
+
+![image6](https://github.com/bysnupy/blog/blob/master/kubernetes/ocp4__multus_img6.png)
 
 At the moment, only macvlan supports configuration in both formats: SimpleMacvlan(YAML) and Raw(JSON). Further YAML format information is available in the Configuring a macvlan network with basic customizations reference. Currently, YAML format provides limited configuration, so the macvlan with static IPAM as JSON format will be demonstrated.
 macvlan generates MAC addresses per the sub-interfaces, and in most cases, Public Cloud Platforms are not allowed due to their security policy and, Hypervisors have limited capabilities. For the RHV (Red Hat Virtualization) use case, you will need to change “No network filter” on your network profile before executing the test. For vSwitch in vSphere environments, similar relaxed policies need to be applied.

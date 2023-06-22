@@ -8,7 +8,7 @@ Among others, I'd like to show you the details of the command aspect of monitori
 
 The "oc adm top pods" shows us the memory usage of pods based on "container_memory_working_set_bytes" metrics as follows through "prometheus-adapter" service in "openshift-monitoring" which is provided according to the metrics rules in the prometheus-adapter configuration.
 
-
+![Access Flow Diagram](https://github.com/bysnupy/blog/blob/master/kubernetes/oc_adm_top_access_flow_diagram.png)
 
 ```console
 // The memory metrics depends on "v1beta1.metrics.k8s.io" API service,

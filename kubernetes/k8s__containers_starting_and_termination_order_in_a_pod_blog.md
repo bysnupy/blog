@@ -6,7 +6,10 @@ In this article, I will take a deeper look into the container’s startup and te
 
 ## Why is this topic important?
 If you want to configure a multi-container application that has some dependencies among themselves within a single Pod, you should control the order in which they start up or shut down as a method for preventing race conditions. For instance, if container A is required to start after container B, or container A needs to delay termination after Container B. As a classic use case, the Istio Proxy is a sidecar container that all traffic from the main containers traverses through and should be started prior to the main containers accepting traffic and should be terminated after the primary containers drain all remaining traffic.
-Each container's lifetime in a Pod
+
+## Each container's lifetime in a Pod
+
+![The diagram shows us the lifetime of three container types in a pod lifecycle.](https://github.com/bysnupy/blog/blob/master/kubernetes/images/each_container_lifetime_in_a_pod.png)
 
 A normal Pod can be organized with three container types, each having a lifetime as follows.
 
@@ -25,15 +28,18 @@ Init Containers must start up successfully before the next one starts. This spec
 
 For instance, all the Init Containers in the following Pod A case would start and terminate A, B, and C in order, and each Init Container must terminate successfully as a one-off task before the Main Containers start. If one of the Init Containers fails, the next one in the list does not start, and the Pod enters an error state, such as Init: Error and Init: CrashLoopBackOff. Look at the Pod B case in the following diagram where this situation is depicted. Init Container C was not started after Init Container B failed. In addition, the Main Container was also not started.
 
+![This diagram shows the init containers starting sequentially and running to completion.](https://github.com/bysnupy/blog/blob/master/kubernetes/images/init_container_starting_order.png)
 
 ## Sidecar Containers
 This container type has been added in recent versions of Kubernetes as of 1.29 (OpenShift 4.16). Both Init Containers and Sidecar Containers have similar configurations. However, a key difference between the two is that Sidecar Containers will set restartPolicy: Always so that the container will keep running after the Main Containers start. This behavior is very useful for supporting sidecar based architectures. The starting order is sequential, one by one, and if one has not started successfully, the next container will not start as was shown in the prior Init Containers section. Even if you mix other Init Containers together, they start in order specified in the spec.initContainers array in the Pod manifest.
 
 For your understanding, look at the following diagram. Sidecar Containers A, B and C are each started one by one and are then run along with the Main Containers. If any Sidecar Container or any Init Container fails, the Main Containers do not start. 
 
+![This diagram shows the sidecar containers starting order.](https://github.com/bysnupy/blog/blob/master/kubernetes/images/sidecar_container_starting_order.png)
 
 Let's look at the termination phase, it shows us the value of the Sidecar Containers.
 
+![This diagram shows the termination order of sidecar containers.](https://github.com/bysnupy/blog/blob/master/kubernetes/images/sidecar_container_termination_order.png)
 
 All Sidecar Containers terminate in the opposite order they started after terminating all the Main Containers.
 This is very helpful in resolving issues if there are any dependencies between Sidecar Containers and Main Containers. For example, if a logging agent must be terminated after the main application so that application logs are processed without any loss. If you’re interested in how this termination order is implemented, refer to the following code sample.
